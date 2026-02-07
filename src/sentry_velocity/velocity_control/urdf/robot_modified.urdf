@@ -1,0 +1,461 @@
+<?xml version="1.0"?>
+<robot name="sentry">
+
+  <material name="gray"><color rgba="0.6 0.6 0.6 1.0"/></material>
+  <material name="black"><color rgba="0 0 0 1.0"/></material>
+  <material name="red"><color rgba="0.8 0.2 0.2 1.0"/></material>
+
+  <link name="base_link">
+    <inertial>
+      <mass value="12.0"/>
+      <!-- lower the inertial origin slightly to reduce tipping -->
+      <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+      <inertia ixx="0.2933" ixy="0" ixz="0" iyy="0.2933" iyz="0" izz="0.4333"/>
+    </inertial>
+
+    <visual>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <geometry><box size="0.5 0.5 0.2"/></geometry>
+      <material name="gray"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0.05" rpy="0 0 0"/>
+      <geometry><box size="0.5 0.5 0.2"/></geometry>
+    </collision>
+  </link>
+
+  <link name="left_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.08"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.08"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode>
+            <mu>30</mu>
+            <mu2>15</mu2>
+            <slip1>0.001</slip1>
+            <slip2>0.001</slip2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+    <inertial>
+      <mass value="1.2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia
+        ixx="0.003733"
+        ixy="0"
+        ixz="0"
+        iyy="0.003733"
+        iyz="0"
+        izz="0.000768"/>
+    </inertial>
+  </link>
+
+  <!-- simplified suspension mount for left wheel: prismatic joint allows small vertical travel -->
+  <link name="left_suspension">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="left_suspension_prismatic" type="prismatic">
+    <parent link="base_link"/>
+    <!-- place mount roughly at wheel hub: centered longitudinally, outside body laterally -->
+    <child link="left_suspension"/>
+    <!-- raised wheel center to match support bottoms: center z = -0.09 (wheel radius 0.08 -> bottom -0.17) -->
+    <origin xyz="0 0.29 -0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.02" upper="0.02" effort="50" velocity="0.5"/>
+    <dynamics damping="20.0"/>
+  </joint>
+
+  <joint name="left_wheel_joint" type="continuous">
+    <!-- parent is suspension mount now; wheel hub is at mount origin -->
+    <parent link="left_suspension"/>
+    <child link="left_wheel"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <!-- limit effort to avoid excessive torque when velocity commands step -->
+    <limit effort="30.0" velocity="30.0"/>
+    <!-- add higher damping to smooth sudden velocity changes (approximate viscous damper) -->
+    <dynamics damping="1.0" friction="0.05"/>
+    <physics>
+      <ode>
+        <stopCfm>0.001</stopCfm>
+        <stopErp>0.8</stopErp>
+      </ode>
+    </physics>
+  </joint>
+
+  <link name="right_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.08"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.10" radius="0.08"/>
+      </geometry>
+      <surface>
+        <friction>
+          <ode>
+            <mu>30</mu>
+            <mu2>15</mu2>
+            <slip1>0.001</slip1>
+            <slip2>0.001</slip2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+
+    <inertial>
+      <mass value="1.2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia
+        ixx="0.003733"
+        ixy="0"
+        ixz="0"
+        iyy="0.003733"
+        iyz="0"
+        izz="0.000768"/>
+    </inertial>
+  </link>
+
+  <!-- simplified suspension mount for right wheel: symmetric to left -->
+  <link name="right_suspension">
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="right_suspension_prismatic" type="prismatic">
+    <parent link="base_link"/>
+    <child link="right_suspension"/>
+    <!-- raised wheel center to match support bottoms -->
+    <origin xyz="0 -0.29 -0.1" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.02" upper="0.02" effort="50" velocity="0.5"/>
+    <dynamics damping="20.0"/>
+  </joint>
+
+  <joint name="right_wheel_joint" type="continuous">
+    <parent link="right_suspension"/>
+    <child link="right_wheel"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="30.0" velocity="30.0"/>
+    <dynamics damping="1.0" friction="0.05"/>
+    <physics>
+      <ode>
+        <stopCfm>0.001</stopCfm>
+        <stopErp>0.8</stopErp>
+      </ode>
+    </physics>
+  </joint>
+
+  <!-- rear support replaced with swivel + spherical wheel to allow free rotation -->
+  <link name="caster_swivel">
+    <inertial>
+      <mass value="0.4"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0006" ixy="0" ixz="0" iyy="0.0006" iyz="0" izz="0.0006"/>
+    </inertial>
+  </link>
+
+  <!-- swivel joint: allow the caster to yaw freely (keeps name for ros2_control mapping) -->
+  <joint name="caster_wheel_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="caster_swivel"/>
+    <origin xyz="-0.18 0.0 -0.11" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.0"/>
+    <!-- increase damping to reduce yaw oscillation -->
+    <dynamics damping="0.5"/>
+  </joint>
+
+  <link name="caster_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.06"/></geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.055"/></geometry>
+      <surface>
+        <friction>
+          <ode>
+            <mu>0.1</mu>
+            <mu2>0.1</mu2>
+            <slip1>0.002</slip1>
+            <slip2>0.002</slip2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0003" ixy="0" ixz="0" iyy="0.0003" iyz="0" izz="0.0003"/>
+    </inertial>
+  </link>
+
+  <joint name="caster_wheel_spin" type="continuous">
+    <parent link="caster_swivel"/>
+    <child link="caster_wheel"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.01" friction="0.0"/>
+  </joint>
+
+  <!-- front support: suspended swivel + small ball wheel for low-friction free rotation -->
+  <link name="front_support_mount">
+    <inertial>
+      <mass value="0.3"/>
+      <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+      <inertia ixx="0.0005" ixy="0" ixz="0" iyy="0.0005" iyz="0" izz="0.0005"/>
+    </inertial>
+  </link>
+
+  <joint name="front_support_prismatic" type="prismatic">
+    <parent link="base_link"/>
+    <child link="front_support_mount"/>
+    <!-- align front support wheel center z with rear caster wheel center (-0.11) -->
+    <origin xyz="0.18 0.0 -0.11" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.02" upper="0.02" effort="20" velocity="0.5"/>
+    <dynamics damping="12.0"/>
+  </joint>
+
+  <link name="front_support_swivel">
+    <inertial>
+      <mass value="0.15"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0002" iyz="0" izz="0.0002"/>
+    </inertial>
+  </link>
+
+  <joint name="front_support_swivel_joint" type="revolute">
+    <parent link="front_support_mount"/>
+    <child link="front_support_swivel"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <!-- allow free swivel with little damping -->
+    <limit lower="-3.14159" upper="3.14159" effort="10" velocity="1.0"/>
+    <!-- increase damping to reduce yaw oscillation -->
+    <dynamics damping="0.5"/>
+  </joint>
+
+  <link name="front_support_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.06"/></geometry>
+      <material name="black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><sphere radius="0.055"/></geometry>
+      <surface>
+        <friction>
+          <ode>
+            <mu>0.1</mu>
+            <mu2>0.1</mu2>
+            <slip1>0.002</slip1>
+            <slip2>0.002</slip2>
+          </ode>
+        </friction>
+      </surface>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.0003" ixy="0" ixz="0" iyy="0.0003" iyz="0" izz="0.0003"/>
+    </inertial>
+  </link>
+
+  <!-- wheel spin joint: allow the ball to spin around an axis (approximate rolling) -->
+  <joint name="front_support_wheel_spin" type="continuous">
+    <parent link="front_support_swivel"/>
+    <child link="front_support_wheel"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <!-- spin axis roughly lateral so forward/back motion can roll the ball -->
+    <axis xyz="0 1 0"/>
+    <dynamics damping="0.01" friction="0.0"/>
+  </joint>
+
+  <link name="lidar_link">
+    <visual>
+      <geometry>
+        <cylinder length="0.04" radius="0.03"/>
+      </geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0.20 0.0 0.2" rpy="0 0.349 0"/>
+  </joint>
+
+  <link name="imu_link">
+    <visual>
+      <geometry><box size="0.02 0.02 0.02"/></geometry>
+      <material name="red"/>
+    </visual>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="lidar_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0.011 0.02329 -0.04412" rpy="0 0 0"/>
+  </joint>
+
+  <gazebo reference="lidar_link">
+    <sensor name="lidar_sensor" type="gpu_lidar">
+      <ignition_frame_id>lidar_link</ignition_frame_id>
+      <always_on>true</always_on>
+      <update_rate>20</update_rate>
+      <visualize>true</visualize>
+      <topic>/lidar</topic>
+      <namespace></namespace>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>200</samples>
+            <resolution>1.0</resolution>
+            <min_angle>-1.57</min_angle>
+            <max_angle>1.57</max_angle>
+          </horizontal>
+          <vertical>
+            <samples>64</samples>
+            <min_angle>-0.12217304764</min_angle>
+            <max_angle>0.90757121104</max_angle>
+          </vertical>
+        </scan>
+        <range>
+          <min>0.1</min>
+          <max>50.0</max>
+        </range>
+      </ray>
+      <noise>
+        <type>gaussian</type>
+        <mean>0.0</mean>
+        <stddev>0.01</stddev>
+      </noise>
+    </sensor>
+  </gazebo>
+  
+  <gazebo reference="caster_wheel">
+    <!-- low-friction spherical rear support -->
+    <mu1 value="0.1"/>
+    <mu2 value="0.1"/>
+  </gazebo>
+  
+  <gazebo reference="left_wheel">
+    <!-- more realistic wheel friction values for traction without excessive locking -->
+    <mu1 value="1.5"/>
+    <mu2 value="1.5"/>
+  </gazebo>
+  
+  <gazebo reference="right_wheel">
+    <mu1 value="1.5"/>
+    <mu2 value="1.5"/>
+  </gazebo>
+
+  <gazebo reference="front_support_wheel">
+    <mu1 value="0.1"/>
+    <mu2 value="0.1"/>
+  </gazebo>
+
+  <gazebo reference="imu_link">
+    <sensor name="imu_sensor" type="imu">
+      <ignition_frame_id>imu_link</ignition_frame_id>
+      <always_on>true</always_on>
+      <update_rate>200</update_rate>
+      <topic>/livox/imu</topic>
+      <namespace>my_diffbot</namespace>
+      <imu>
+        <angular_velocity>
+          <x>
+            <noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise>
+          </x>
+          <y>
+            <noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise>
+          </y>
+          <z>
+            <noise type="gaussian"><mean>0.0</mean><stddev>0.0002</stddev></noise>
+          </z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x>
+            <noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise>
+          </x>
+          <y>
+            <noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise>
+          </y>
+          <z>
+            <noise type="gaussian"><mean>0.0</mean><stddev>0.005</stddev></noise>
+          </z>
+        </linear_acceleration>
+      </imu>
+    </sensor>
+  </gazebo>
+
+  <ros2_control name="IgnitionSystem" type="system">
+    <hardware>
+      <plugin>ign_ros2_control/IgnitionSystem</plugin>
+    </hardware>
+  
+    <joint name="left_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-80</param>
+        <param name="max">80</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    
+    <joint name="right_wheel_joint">
+      <command_interface name="velocity">
+        <param name="min">-80</param>
+        <param name="max">80</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+
+    <joint name="caster_wheel_joint">
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <gazebo>
+    <plugin filename="libign_ros2_control-system.so" name="ign_ros2_control::IgnitionROS2ControlPlugin">
+      <parameters>/home/lehan/navigationsim/install/velocity_control/share/velocity_control/config/velocity_controller.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>
