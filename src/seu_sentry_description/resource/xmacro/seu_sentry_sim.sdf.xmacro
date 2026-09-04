@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<sdf version="1.11">
+  <xmacro_include uri="model://seu_sentry/seu_sentry.def.xmacro"/>
+  <xmacro_include uri="model://mid360/model.sdf.xmacro"/>
+
+  <model name="seu_sentry">
+    <!-- Spawn height is supplied by the launch file; keep this model-local pose neutral. -->
+    <pose>0 0 0 0 0 0</pose>
+    <xmacro_block name="seu_sentry"/>
+
+    <!-- One Mid360 only. It is mounted beside the gimbal and follows yaw. -->
+    <xmacro_block name="livox" prefix="" parent="gimbal_yaw"
+      pose="0 0.16 0.20 0.52 0 1.5708" update_rate="20" samples="1875"/>
+
+    <plugin filename="gz-sim-joint-state-publisher-system"
+      name="gz::sim::systems::JointStatePublisher"/>
+
+    <plugin filename="gz-sim-odometry-publisher-system"
+      name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>chassis</robot_base_frame>
+      <dimensions>2</dimensions>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <odom_topic>/wheel/odometry</odom_topic>
+      <child_frame_id>chassis</child_frame_id>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>gimbal_yaw_joint</joint_name><use_force_commands>false</use_force_commands><p_gain>0.2</p_gain><i_gain>0.01</i_gain>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>front_left_steer_joint</joint_name><p_gain>20</p_gain><i_gain>0.1</i_gain><d_gain>1</d_gain><cmd_min>-40</cmd_min><cmd_max>40</cmd_max>
+    </plugin>
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>front_right_steer_joint</joint_name><p_gain>20</p_gain><i_gain>0.1</i_gain><d_gain>1</d_gain><cmd_min>-40</cmd_min><cmd_max>40</cmd_max>
+    </plugin>
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>rear_left_steer_joint</joint_name><p_gain>20</p_gain><i_gain>0.1</i_gain><d_gain>1</d_gain><cmd_min>-40</cmd_min><cmd_max>40</cmd_max>
+    </plugin>
+    <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
+      <joint_name>rear_right_steer_joint</joint_name><p_gain>20</p_gain><i_gain>0.1</i_gain><d_gain>1</d_gain><cmd_min>-40</cmd_min><cmd_max>40</cmd_max>
+    </plugin>
+
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>front_left_wheel_joint</joint_name><use_force_commands>false</use_force_commands><p_gain>0.2</p_gain><i_gain>0.01</i_gain>
+    </plugin>
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>front_right_wheel_joint</joint_name><use_force_commands>false</use_force_commands><p_gain>0.2</p_gain><i_gain>0.01</i_gain>
+    </plugin>
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>rear_left_wheel_joint</joint_name><use_force_commands>false</use_force_commands><p_gain>0.2</p_gain><i_gain>0.01</i_gain>
+    </plugin>
+    <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
+      <joint_name>rear_right_wheel_joint</joint_name><use_force_commands>false</use_force_commands><p_gain>0.2</p_gain><i_gain>0.01</i_gain>
+    </plugin>
+  </model>
+</sdf>

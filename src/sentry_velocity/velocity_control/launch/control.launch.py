@@ -6,15 +6,17 @@ def generate_launch_description():
     
     # 加载 joint_state_broadcaster
     load_joint_state_broadcaster = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'joint_state_broadcaster'],
+        cmd=['ros2', 'run', 'controller_manager', 'spawner',
+             'joint_state_broadcaster', '-c', '/controller_manager',
+             '--controller-manager-timeout', '60'],
         output='screen'
     )
     
     # 加载 velocity_controller
     load_velocity_controller = ExecuteProcess(
-        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
-             'velocity_controller'],
+        cmd=['ros2', 'run', 'controller_manager', 'spawner',
+             'velocity_controller', '-c', '/controller_manager',
+             '--controller-manager-timeout', '60'],
         output='screen'
     )
     

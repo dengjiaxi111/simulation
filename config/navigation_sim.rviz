@@ -1,0 +1,55 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Tool Properties
+    Name: Tool Properties
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Reference Frame: map
+    - Class: rviz_default_plugins/Map
+      Name: StaticMap
+      Enabled: true
+      Topic: /static_map
+      Alpha: 0.55
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: true
+      Frame Timeout: 15
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Robot Description: robot_description
+      Description Source: Topic
+      Visual Enabled: true
+      Collision Enabled: false
+    - Class: rviz_default_plugins/Path
+      Name: PlannedPath
+      Enabled: true
+      Topic: /plan
+      Color: 25; 255; 0
+    - Class: rviz_default_plugins/PointCloud2
+      Name: RegisteredCloud
+      Enabled: false
+      Topic: /cloud_registered
+  Global Options:
+    Fixed Frame: map
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/SetInitialPose
+      Topic: /initialpose
+    - Class: rviz_default_plugins/SetGoal
+      Topic: /goal_pose
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 15
+      Pitch: 1.2
+      Yaw: 0.8
+Window Geometry:
+  Width: 1400
+  Height: 900

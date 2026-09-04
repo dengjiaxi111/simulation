@@ -97,6 +97,12 @@ namespace my_sim
         realtime_odom_pub_ = 
           std::make_shared<realtime_tools::RealtimePublisher<nav_msgs::msg::Odometry>>(
             odom_pub_); 
+        chassis_odom_pub_ =
+          get_node()->create_publisher<robots_msgs::msg::ChassisOdom>(
+            "/ChassisOdom", 10);
+        realtime_chassis_odom_pub_ =
+          std::make_shared<realtime_tools::RealtimePublisher<robots_msgs::msg::ChassisOdom>>(
+            chassis_odom_pub_);
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(get_node());
         //重置里程计
         reset_odometry();
@@ -227,6 +233,14 @@ namespace my_sim
 
             double robot_linear = (actual_left_vel+actual_right_vel)*wheel_radius_/2.0;
             double robot_angular = (actual_right_vel-actual_left_vel)* wheel_radius_/wheel_separation_;
+            if (realtime_chassis_odom_pub_ && realtime_chassis_odom_pub_->trylock()) {
+                auto & feedback = realtime_chassis_odom_pub_->msg_;
+                feedback.speed_x = static_cast<float>(robot_linear);
+                feedback.speed_w = static_cast<float>(robot_angular);
+                // 仿真没有电容模型，使用正常工作电压，避免触发实车低压限幅逻辑。
+                feedback.capacitor_voltage = 24.0F;
+                realtime_chassis_odom_pub_->unlockAndPublish();
+            }
             double delta_theta = robot_angular * dt;
             double avg_theta = theta_ + delta_theta /2.0;
             double delta_x = robot_linear * cos(avg_theta)*dt;

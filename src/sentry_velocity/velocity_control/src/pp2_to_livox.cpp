@@ -5,6 +5,8 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/msg/point_field.hpp>
 #include <std_msgs/msg/header.hpp>
+#include <vector>
+#include <string>
 #include "livox_ros_driver2/msg/custom_msg.hpp"
 
 using std::placeholders::_1;
@@ -13,19 +15,29 @@ class Pp2ToLivoxNode : public rclcpp::Node {
 public:
   Pp2ToLivoxNode() : Node("pp2_to_livox") {
     this->declare_parameter<std::string>("input_topic", "/points");
-    std::string input_topic = this->get_parameter("input_topic").as_string();
+    this->declare_parameter<std::vector<std::string>>(
+      "output_topics", std::vector<std::string>{"/livox/lidar"});
+    this->declare_parameter<std::string>("frame_id", "livox_frame");
 
-    pub_ = this->create_publisher<livox_ros_driver2::msg::CustomMsg>("/livox/lidar", rclcpp::SensorDataQoS());
+    std::string input_topic = this->get_parameter("input_topic").as_string();
+    output_topics_ = this->get_parameter("output_topics").as_string_array();
+    output_frame_id_ = this->get_parameter("frame_id").as_string();
+
+    for (const auto &topic : output_topics_) {
+      pubs_.push_back(this->create_publisher<livox_ros_driver2::msg::CustomMsg>(topic, rclcpp::SensorDataQoS()));
+    }
     sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
       input_topic, rclcpp::SensorDataQoS(), std::bind(&Pp2ToLivoxNode::cloudCallback, this, _1));
 
-    RCLCPP_INFO(this->get_logger(), "pp2_to_livox: subscribing to '%s' publishing to '/livox/lidar'",
-                input_topic.c_str());
+    RCLCPP_INFO(this->get_logger(), "pp2_to_livox: subscribing to '%s' publishing %zu Livox topic(s)",
+                input_topic.c_str(), pubs_.size());
   }
 
 private:
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
-  rclcpp::Publisher<livox_ros_driver2::msg::CustomMsg>::SharedPtr pub_;
+  std::vector<rclcpp::Publisher<livox_ros_driver2::msg::CustomMsg>::SharedPtr> pubs_;
+  std::vector<std::string> output_topics_;
+  std::string output_frame_id_;
 
   struct FieldInfo {
     bool exists = false;
@@ -49,7 +61,7 @@ private:
     livox_ros_driver2::msg::CustomMsg out;
     // ✅ FIX: Use input cloud's timestamp directly (from Gazebo bridge)
     out.header.stamp = cloud->header.stamp;
-    out.header.frame_id = cloud->header.frame_id;
+    out.header.frame_id = output_frame_id_;
     uint64_t ts_ns = (uint64_t)cloud->header.stamp.sec * 1000000000ULL + cloud->header.stamp.nanosec;
     out.timebase = ts_ns;
     out.lidar_id = 0;
@@ -124,8 +136,9 @@ private:
     // set final point count
     out.point_num = static_cast<uint32_t>(out.points.size());
 
-    // publish
-    pub_->publish(out);
+    for (auto &pub : pubs_) {
+      pub->publish(out);
+    }
   }
 };
 

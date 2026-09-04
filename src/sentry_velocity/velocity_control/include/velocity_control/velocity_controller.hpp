@@ -11,6 +11,7 @@
 #include "rclcpp_lifecycle/state.hpp"
 #include "realtime_tools/realtime_buffer.h"
 #include "realtime_tools/realtime_publisher.h"
+#include "robots_msgs/msg/chassis_odom.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 #include "control_toolbox/pid.hpp"
@@ -62,6 +63,10 @@ namespace my_sim
         std::shared_ptr<rclcpp::Publisher<nav_msgs::msg::Odometry>> odom_pub_;
         std::shared_ptr<realtime_tools::RealtimePublisher<nav_msgs::msg::Odometry>> 
           realtime_odom_pub_;
+        std::shared_ptr<rclcpp::Publisher<robots_msgs::msg::ChassisOdom>>
+          chassis_odom_pub_;
+        std::shared_ptr<realtime_tools::RealtimePublisher<robots_msgs::msg::ChassisOdom>>
+          realtime_chassis_odom_pub_;
         std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
         // 里程计状态
         double x_;

@@ -15,7 +15,9 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(realtime_tools REQUIRED)
+find_package(robots_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(control_toolbox REQUIRED)
 find_package(livox_ros_driver2 REQUIRED)
@@ -39,6 +41,7 @@ ament_target_dependencies(velocity_controller
   rclcpp
   rclcpp_lifecycle
   realtime_tools
+  robots_msgs
   sensor_msgs
   tf2_ros
   control_toolbox
@@ -76,12 +79,35 @@ install(TARGETS pp2_to_livox_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(imu_alias_node src/imu_alias.cpp)
+target_include_directories(imu_alias_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+ament_target_dependencies(imu_alias_node rclcpp sensor_msgs)
+
+install(TARGETS imu_alias_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(wheel_sim_adapter_node src/wheel_sim_adapter.cpp)
+ament_target_dependencies(wheel_sim_adapter_node
+  geometry_msgs nav_msgs rclcpp robots_msgs sensor_msgs std_msgs
+)
+
+install(TARGETS wheel_sim_adapter_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY urdf
   DESTINATION share/${PROJECT_NAME}/
 )
 
 install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}/
+)
+
+install(DIRECTORY ../gazeboworld/
+  DESTINATION share/${PROJECT_NAME}/gazeboworld
 )
 
 
@@ -104,6 +130,7 @@ ament_export_dependencies(
   rclcpp
   rclcpp_lifecycle
   realtime_tools
+  robots_msgs
   sensor_msgs
   tf2_ros
   control_toolbox

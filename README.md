@@ -63,10 +63,9 @@ navigationsim/
 
 ## 使用说明
 
-### 修改配置路径  
+### Jazzy 运行说明
 
-- 将urdf文件末尾的`/home/lehan/navigationsim/install/velocity_control/share/velocity_control/config/velocity_controller.yaml`改为正确的yaml文件路径  
-- 同理，将launch文件中的`gazeboworld_path`一项改为正确的`gazeboworld`路径
+Gazebo world 和控制器配置会在编译安装时进入 `velocity_control` 包目录，launch 会自动注入 `velocity_controller.yaml` 路径，不需要手工修改 URDF 里的绝对路径。
 
 
 ### 启动完整仿真
