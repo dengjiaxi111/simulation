@@ -9,9 +9,12 @@
     <xmacro_block name="seu_sentry"/>
 
     <!-- One Mid360 only. It is mounted beside the gimbal and follows yaw. -->
-    <xmacro_block name="livox" prefix="" parent="gimbal_yaw"
-      pose="0 0.16 0.20 0.52 0 1.5708" update_rate="20" samples="1875"/>
-
+    <xmacro_block name="livox"
+  prefix=""
+  parent="base_link"
+  pose="0.04 0.110 0.1 -0.785 0 0"
+  update_rate="20"
+  samples="1875"/>
     <plugin filename="gz-sim-joint-state-publisher-system"
       name="gz::sim::systems::JointStatePublisher"/>
 

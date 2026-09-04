@@ -559,6 +559,14 @@ main() {
   local joint_state_bridge_pid="${COMPONENT_PIDS[-1]}"
   wait_for_message "/joint_states" 30 "${joint_state_bridge_pid}" "云台关节状态"
 
+  # Publish the single ROS-side LiDAR mounting transform before LIO starts.
+  # The Gazebo sensor pose and this transform must use the same calibration.
+  start_component \
+    "Livox 静态外参（base_link→livox_frame）" \
+    "${NAV_WS}" \
+    "source ${SIM_SETUP}; source ${NAV_SETUP}; ${nav_prefix}" \
+    "ros2 run tf2_ros static_transform_publisher --x 0.04 --y 0.110 --z 0.1 --roll -0.785 --pitch 0 --yaw 0 --frame-id base_link --child-frame-id livox_frame --ros-args -p use_sim_time:=true"
+
   start_component \
     "Small Point-LIO（仿真话题，不启动 Livox 实车驱动）" \
     "${NAV_WS}" \
