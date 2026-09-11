@@ -286,9 +286,8 @@ start_untracked_component() {
 
   info "启动 ${name}（独立终端）"
   # Keyboard teleop must own a real TTY; a detached background shell makes
-  # stdin non-interactive and the node exits immediately.  Keep this terminal
-  # outside COMPONENT_PIDS so pressing X only releases the override and does
-  # not make the main simulation supervisor shut down.
+  # stdin non-interactive and the node exits immediately. Keep this terminal
+  # outside COMPONENT_PIDS so pressing X does not stop the simulation supervisor.
   setsid gnome-terminal --title="${name}" -- bash -lc "
     set -e
     exec 9>&-
@@ -573,7 +572,7 @@ main() {
     "Gazebo 与机器人仿真（${MODEL_MODE}）" \
     "${SIM_WS}" \
     "source '${SIM_SETUP}'; source '${NAV_SETUP}'" \
-    "ros2 launch velocity_control run.launch.py model_mode:=${MODEL_MODE} wheel_model_path:=${WHEEL_MODEL_PATH} wheel_resource_path:=${WHEEL_RESOURCE_PATH} enable_motion_adapter:=false"
+    "ros2 launch velocity_control run.launch.py model_mode:=${MODEL_MODE} wheel_model_path:=${WHEEL_MODEL_PATH} wheel_resource_path:=${WHEEL_RESOURCE_PATH} enable_motion_adapter:=true"
   local gazebo_pid="${COMPONENT_PIDS[-1]}"
 
   # Open the interactive tools immediately. They can wait for ROS topics while
@@ -609,13 +608,8 @@ main() {
   wait_for_message "/livox/lidar" 90 "${gazebo_pid}" "仿真 Livox 点云"
   wait_for_message "/livox/imu" 90 "${gazebo_pid}" "仿真 IMU"
 
-  start_component \
-    "Gazebo 云台关节状态桥接" \
-    "${SIM_WS}" \
-    "source ${SIM_SETUP}; source ${NAV_SETUP}; ${nav_prefix}" \
-    "ros2 run ros_gz_bridge parameter_bridge '/world/default/model/sentry/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model' --ros-args -r /world/default/model/sentry/joint_state:=/joint_states -p use_sim_time:=true"
-  local joint_state_bridge_pid="${COMPONENT_PIDS[-1]}"
-  wait_for_message "/joint_states" 30 "${joint_state_bridge_pid}" "云台关节状态"
+  # run.launch.py 的 wheel_sim_bridge 已通过 swerve_bridge.yaml 桥接 /joint_states。
+  wait_for_message "/joint_states" 30 "${gazebo_pid}" "云台及舵轮关节状态"
 
   # Publish the single ROS-side LiDAR mounting transform before LIO starts.
   # The Gazebo sensor pose and this transform must use the same calibration.
@@ -627,7 +621,7 @@ main() {
 
   if [[ "${USE_KEYBOARD}" == "true" ]]; then
     start_untracked_component \
-      "键盘控制（WASD/JL/QE）" \
+      "键盘控制（K/N 模式，WASD/JL/QE）" \
       "${SIM_WS}" \
       "source ${SIM_SETUP}; source ${NAV_SETUP}; ${nav_prefix}" \
       "ros2 run velocity_control keyboard_teleop_node --ros-args -p use_sim_time:=true"
@@ -681,12 +675,6 @@ main() {
     "ros2 launch fake_vel_transform fake_vel_transform_s.launch.py use_sim_time:=true use_fake_vel:=true"
   local fake_vel_pid="${COMPONENT_PIDS[-1]}"
 
-  start_component \
-    "仿真云台旋转与底盘适配器" \
-    "${SIM_WS}" \
-    "source ${SIM_SETUP}; source ${NAV_SETUP}; ${nav_prefix}" \
-    "ros2 run velocity_control wheel_sim_adapter_node --ros-args -p use_sim_time:=true -p gimbal_spin_speed:=3.14"
-
   start_terminal_component \
     "Navigation2026 导航服务器（规划与控制）" \
     "${NAV_WS}" \
@@ -696,6 +684,11 @@ main() {
 
   wait_for_message "/Odometry/EC" 60 "${fake_vel_pid}" "仿真底盘速度反馈"
 
+  wait_for_node "$(namespaced_node nav_server)" 90 "${controller_pid}" "Navigation2026 nav_server"
+
+  info "定位与导航服务已就绪，切换到导航模式并启动自动云台旋转。"
+  ros2 topic pub --once /control_mode std_msgs/msg/String "{data: navigation}" >/dev/null
+
   if [[ "${USE_DECISION}" == "true" ]]; then
     if ros2 pkg prefix sentry_decision >/dev/null 2>&1; then
       start_component "决策节点" "${NAV_WS}" "source ${SIM_SETUP}; source ${NAV_SETUP}; ${nav_prefix}" "ros2 run sentry_decision sentry_decision_node --ros-args -p use_sim_time:=true"
@@ -703,8 +696,6 @@ main() {
       error "USE_DECISION=true，但找不到 sentry_decision，已跳过决策节点。"
     fi
   fi
-
-  wait_for_node "$(namespaced_node nav_server)" 90 "${controller_pid}" "Navigation2026 nav_server"
 
   info "Gazebo、仿真底盘、LIO、Navigation2026、RViz/决策已启动；未启动 Livox 实车驱动或串口驱动。"
   printf '%s\n' "所有日志会继续显示在本终端；按 Ctrl+C 可一次性停止。"

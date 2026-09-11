@@ -199,18 +199,13 @@ private:
 
   void calculate_commands(double vx, double vy, double wz)
   {
-    // sentry2026 uses +X forward/+Y left. The CAD/SDF chassis uses -Y
-    // forward/-X left, so transform the command before applying SDF module
-    // positions and invert yaw for the reflected frame.
-    const double sdf_vx = -vy;
-    const double sdf_vy = -vx;
-    const double sdf_wz = -wz;
     double greatest_wheel_speed = 0.0;
     for (auto & module : modules_) {
-      // General form of the sentry2026 inverse kinematics. Per-module positions
-      // replace the embedded controller's square-chassis wR shortcut.
-      const double module_vx = sdf_vx - sdf_wz * module.y;
-      const double module_vy = sdf_vy + sdf_wz * module.x;
+      // /cmd_vel_chassis is already expressed in the SDF chassis frame by
+      // wheel_sim_adapter. Per-module positions replace sentry2026's square
+      // chassis wR shortcut without applying another frame transform here.
+      const double module_vx = vx - wz * module.y;
+      const double module_vy = vy + wz * module.x;
       double target_direction = std::atan2(module_vy, module_vx);
       double target_speed = std::hypot(module_vx, module_vy) / wheel_radius_;
       const double current_direction =

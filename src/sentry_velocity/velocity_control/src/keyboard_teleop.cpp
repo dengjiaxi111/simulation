@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cctype>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -9,8 +10,8 @@
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/string.hpp"
 
 class TerminalRawMode
 {
@@ -44,28 +45,40 @@ public:
     linear_speed_ = declare_parameter<double>("linear_speed", 0.8);
     chassis_yaw_speed_ = declare_parameter<double>("chassis_yaw_speed", 1.2);
     gimbal_yaw_speed_ = declare_parameter<double>("gimbal_yaw_speed", 1.5);
-    chassis_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_chassis", 10);
-    gimbal_pub_ = create_publisher<std_msgs::msg::Float64>(
-      "/model/sentry/joint/gimbal_yaw_joint/cmd_vel", 10);
-    active_pub_ = create_publisher<std_msgs::msg::Bool>("/keyboard_control_active", 10);
+    key_timeout_ = declare_parameter<double>("key_timeout", 0.25);
+
+    keyboard_cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(
+      "/keyboard/cmd_vel_gimbal", 10);
+    keyboard_gimbal_pub_ = create_publisher<std_msgs::msg::Float64>(
+      "/keyboard/gimbal_cmd_vel", 10);
+    mode_pub_ = create_publisher<std_msgs::msg::String>("/control_mode", 10);
+    mode_sub_ = create_subscription<std_msgs::msg::String>(
+      "/control_mode", 10,
+      [this](const std_msgs::msg::String::SharedPtr msg) {
+        if (msg->data == "keyboard" || msg->data == "navigation") {
+          mode_ = msg->data;
+        }
+      });
   }
 
   void run()
   {
     TerminalRawMode raw_mode;
     print_help();
-    rclcpp::WallRate rate(20.0);
+    rclcpp::WallRate rate(50.0);
     while (rclcpp::ok() && !exit_requested_) {
       char key = 0;
-      if (read_key(key)) handle_key(key);
+      while (read_key(key)) handle_key(key);
       publish_state();
       rclcpp::spin_some(shared_from_this());
       rate.sleep();
     }
-    stop_and_release();
+    publish_stop();
   }
 
 private:
+  using SteadyClock = std::chrono::steady_clock;
+
   static bool read_key(char & key)
   {
     fd_set set;
@@ -78,75 +91,106 @@ private:
 
   void handle_key(char key)
   {
-    if (key >= 'A' && key <= 'Z') key = static_cast<char>(key - 'A' + 'a');
-    geometry_msgs::msg::Twist next_chassis;
+    key = static_cast<char>(std::tolower(static_cast<unsigned char>(key)));
+    if (key == 'k') {
+      publish_stop();
+      publish_mode("keyboard");
+      return;
+    }
+    if (key == 'n') {
+      publish_stop();
+      publish_mode("navigation");
+      return;
+    }
+    if (key == 'x') {
+      exit_requested_ = true;
+      return;
+    }
+
+    geometry_msgs::msg::Twist next_command;
     double next_gimbal = 0.0;
     bool recognized = true;
-
     switch (key) {
-      case 'w': next_chassis.linear.x = linear_speed_; break;
-      case 's': next_chassis.linear.x = -linear_speed_; break;
-      case 'a': next_chassis.linear.y = linear_speed_; break;
-      case 'd': next_chassis.linear.y = -linear_speed_; break;
-      case 'j': next_chassis.angular.z = chassis_yaw_speed_; break;
-      case 'l': next_chassis.angular.z = -chassis_yaw_speed_; break;
+      case 'w': next_command.linear.x = linear_speed_; break;
+      case 's': next_command.linear.x = -linear_speed_; break;
+      case 'a': next_command.linear.y = linear_speed_; break;
+      case 'd': next_command.linear.y = -linear_speed_; break;
+      case 'j': next_command.angular.z = chassis_yaw_speed_; break;
+      case 'l': next_command.angular.z = -chassis_yaw_speed_; break;
       case 'q': next_gimbal = gimbal_yaw_speed_; break;
       case 'e': next_gimbal = -gimbal_yaw_speed_; break;
       case ' ': break;
-      case 'x': exit_requested_ = true; break;
       default: recognized = false; break;
     }
     if (!recognized) return;
-    active_ = !exit_requested_;
-    chassis_command_ = next_chassis;
+
+    keyboard_command_ = next_command;
     gimbal_command_ = next_gimbal;
+    last_key_time_ = SteadyClock::now();
+    have_key_command_ = true;
+  }
+
+  bool key_command_is_fresh() const
+  {
+    if (!have_key_command_) return false;
+    return std::chrono::duration<double>(SteadyClock::now() - last_key_time_).count() <=
+           key_timeout_;
   }
 
   void publish_state()
   {
-    std_msgs::msg::Bool active;
-    active.data = active_;
-    active_pub_->publish(active);
-    if (!active_) return;
-    chassis_pub_->publish(chassis_command_);
+    if (mode_ != "keyboard" || !key_command_is_fresh()) {
+      publish_stop();
+      return;
+    }
+    keyboard_cmd_pub_->publish(keyboard_command_);
     std_msgs::msg::Float64 gimbal;
     gimbal.data = gimbal_command_;
-    gimbal_pub_->publish(gimbal);
+    keyboard_gimbal_pub_->publish(gimbal);
   }
 
-  void stop_and_release()
+  void publish_stop()
   {
-    chassis_pub_->publish(geometry_msgs::msg::Twist{});
-    std_msgs::msg::Float64 stop_gimbal;
-    stop_gimbal.data = 0.0;
-    gimbal_pub_->publish(stop_gimbal);
-    std_msgs::msg::Bool active;
-    active.data = false;
-    for (int i = 0; i < 3; ++i) {
-      active_pub_->publish(active);
-      rclcpp::sleep_for(std::chrono::milliseconds(30));
-    }
+    keyboard_command_ = geometry_msgs::msg::Twist{};
+    gimbal_command_ = 0.0;
+    keyboard_cmd_pub_->publish(keyboard_command_);
+    std_msgs::msg::Float64 gimbal;
+    gimbal.data = 0.0;
+    keyboard_gimbal_pub_->publish(gimbal);
+  }
+
+  void publish_mode(const std::string & mode)
+  {
+    mode_ = mode;
+    std_msgs::msg::String message;
+    message.data = mode;
+    mode_pub_->publish(message);
+    RCLCPP_INFO(get_logger(), "Control mode: %s", mode.c_str());
   }
 
   static void print_help()
   {
-    std::cout << "\nSEU 仿真键盘控制（按键即接管）\n"
-              << "W/S: 前进/后退  A/D: 左移/右移\n"
+    std::cout << "\nSEU 仿真键盘控制（速度以云台/base_link坐标系表达）\n"
+              << "K: 键盘模式  N: 导航模式（不恢复旧目标）\n"
+              << "W/S: 云台前进/后退  A/D: 云台左移/右移\n"
               << "J/L: 底盘逆/顺时针  Q/E: 云台逆/顺时针\n"
-              << "空格: 急停并保持键盘接管\n"
-              << "X: 停止、退出键盘控制并恢复导航/自动云台\n" << std::flush;
+              << "空格: 急停  X: 停止并退出键盘终端\n" << std::flush;
   }
 
   double linear_speed_{0.8};
   double chassis_yaw_speed_{1.2};
   double gimbal_yaw_speed_{1.5};
-  bool active_{false};
+  double key_timeout_{0.25};
   bool exit_requested_{false};
-  geometry_msgs::msg::Twist chassis_command_;
+  bool have_key_command_{false};
+  std::string mode_{"keyboard"};
+  SteadyClock::time_point last_key_time_{};
+  geometry_msgs::msg::Twist keyboard_command_;
   double gimbal_command_{0.0};
-  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr chassis_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gimbal_pub_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr active_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr keyboard_cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr keyboard_gimbal_pub_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_pub_;
+  rclcpp::Subscription<std_msgs::msg::String>::SharedPtr mode_sub_;
 };
 
 int main(int argc, char ** argv)

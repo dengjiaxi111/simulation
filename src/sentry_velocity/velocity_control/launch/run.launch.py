@@ -25,7 +25,7 @@ WHEEL_RESOURCE_DEFAULT = (
     "/home/dengjiaxi/simulation_seu/navigationsim/src/"
     "seu_sentry_description/resource/models"
 )
-WHEEL_SPAWN_Z_DEFAULT = "1.800"
+WHEEL_SPAWN_Z_DEFAULT = "0.600"
 
 
 def _existing_paths(paths):
