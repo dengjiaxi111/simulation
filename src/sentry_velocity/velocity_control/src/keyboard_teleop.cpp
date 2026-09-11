@@ -42,10 +42,11 @@ public:
   KeyboardTeleop()
   : Node("keyboard_teleop")
   {
-    linear_speed_ = declare_parameter<double>("linear_speed", 0.8);
+    linear_speed_ = declare_parameter<double>("linear_speed", 1.0);
     chassis_yaw_speed_ = declare_parameter<double>("chassis_yaw_speed", 1.2);
-    gimbal_yaw_speed_ = declare_parameter<double>("gimbal_yaw_speed", 1.5);
-    key_timeout_ = declare_parameter<double>("key_timeout", 0.25);
+    gimbal_yaw_speed_ = declare_parameter<double>(
+      "gimbal_yaw_speed", 1.7453292519943295);
+    gimbal_key_timeout_ = declare_parameter<double>("gimbal_key_timeout", 0.20);
 
     keyboard_cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>(
       "/keyboard/cmd_vel_gimbal", 10);
@@ -77,8 +78,6 @@ public:
   }
 
 private:
-  using SteadyClock = std::chrono::steady_clock;
-
   static bool read_key(char & key)
   {
     fd_set set;
@@ -124,28 +123,30 @@ private:
     }
     if (!recognized) return;
 
-    keyboard_command_ = next_command;
-    gimbal_command_ = next_gimbal;
-    last_key_time_ = SteadyClock::now();
-    have_key_command_ = true;
-  }
-
-  bool key_command_is_fresh() const
-  {
-    if (!have_key_command_) return false;
-    return std::chrono::duration<double>(SteadyClock::now() - last_key_time_).count() <=
-           key_timeout_;
+    if (key == 'q' || key == 'e') {
+      // Gimbal rotation is independent of the latched chassis command.
+      gimbal_command_ = next_gimbal;
+      gimbal_key_active_ = true;
+      last_gimbal_key_time_ = std::chrono::steady_clock::now();
+    } else {
+      keyboard_command_ = next_command;
+      gimbal_command_ = 0.0;
+      gimbal_key_active_ = false;
+    }
   }
 
   void publish_state()
   {
-    if (mode_ != "keyboard" || !key_command_is_fresh()) {
+    if (mode_ != "keyboard") {
       publish_stop();
       return;
     }
     keyboard_cmd_pub_->publish(keyboard_command_);
     std_msgs::msg::Float64 gimbal;
-    gimbal.data = gimbal_command_;
+    const bool gimbal_fresh = gimbal_key_active_ &&
+      std::chrono::duration<double>(std::chrono::steady_clock::now() - last_gimbal_key_time_).count() <=
+      gimbal_key_timeout_;
+    gimbal.data = gimbal_fresh ? gimbal_command_ : 0.0;
     keyboard_gimbal_pub_->publish(gimbal);
   }
 
@@ -172,19 +173,20 @@ private:
   {
     std::cout << "\nSEU 仿真键盘控制（速度以云台/base_link坐标系表达）\n"
               << "K: 键盘模式  N: 导航模式（不恢复旧目标）\n"
-              << "W/S: 云台前进/后退  A/D: 云台左移/右移\n"
-              << "J/L: 底盘逆/顺时针  Q/E: 云台逆/顺时针\n"
+              << "W/S: 云台前进/后退  A/D: 云台左移/右移（1.0 m/s）\n"
+              << "J/L: 底盘逆/顺时针  Q/E: 云台逆/顺时针（100 deg/s）\n"
+              << "控制键单击后持续生效，按其他控制键可替换当前命令\n"
               << "空格: 急停  X: 停止并退出键盘终端\n" << std::flush;
   }
 
-  double linear_speed_{0.8};
+  double linear_speed_{1.0};
   double chassis_yaw_speed_{1.2};
-  double gimbal_yaw_speed_{1.5};
-  double key_timeout_{0.25};
+  double gimbal_yaw_speed_{1.7453292519943295};
+  double gimbal_key_timeout_{0.20};
   bool exit_requested_{false};
-  bool have_key_command_{false};
+  bool gimbal_key_active_{false};
   std::string mode_{"keyboard"};
-  SteadyClock::time_point last_key_time_{};
+  std::chrono::steady_clock::time_point last_gimbal_key_time_{};
   geometry_msgs::msg::Twist keyboard_command_;
   double gimbal_command_{0.0};
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr keyboard_cmd_pub_;
