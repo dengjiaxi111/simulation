@@ -19,13 +19,13 @@ import xml.etree.ElementTree as ET
 
 WHEEL_MODEL_DEFAULT = (
     "/home/dengjiaxi/simulation_seu/navigationsim/src/"
-    "seu_sentry_description/resource/xmacro/seu_sentry_sim.sdf.xmacro"
+    "seu_sentry_description/resource/xmacro/new_seu_sentry_sim.sdf.xmacro"
 )
 WHEEL_RESOURCE_DEFAULT = (
     "/home/dengjiaxi/simulation_seu/navigationsim/src/"
     "seu_sentry_description/resource/models"
 )
-WHEEL_SPAWN_Z_DEFAULT = "1.000"
+WHEEL_SPAWN_Z_DEFAULT = "1.800"
 
 
 def _existing_paths(paths):

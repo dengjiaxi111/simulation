@@ -10,6 +10,7 @@
 #include "robots_msgs/msg/chassis_odom.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 namespace velocity_control
 {
@@ -40,6 +41,13 @@ public:
     joint_state_sub_ = create_subscription<sensor_msgs::msg::JointState>(
       "/joint_states", rclcpp::SensorDataQoS(),
       std::bind(&WheelSimAdapter::on_joint_state, this, std::placeholders::_1));
+    keyboard_override_sub_ = create_subscription<std_msgs::msg::Bool>(
+      "/keyboard_control_active", 10,
+      [this](const std_msgs::msg::Bool::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        keyboard_override_ = msg->data;
+        keyboard_override_stamp_ = this->now();
+      });
 
     gimbal_timer_ = create_wall_timer(
       std::chrono::milliseconds(20),
@@ -71,6 +79,7 @@ private:
 
   void on_gimbal_cmd(const geometry_msgs::msg::Twist::SharedPtr msg)
   {
+    if (keyboard_override_active()) return;
     const double yaw = gimbal_angle();
     const double cosine = std::cos(yaw);
     const double sine = std::sin(yaw);
@@ -106,15 +115,24 @@ private:
 
   void publish_gimbal_command()
   {
+    if (keyboard_override_active()) return;
     std_msgs::msg::Float64 command;
     command.data = gimbal_spin_speed_;
     gimbal_cmd_pub_->publish(command);
+  }
+
+  bool keyboard_override_active() const
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return keyboard_override_ && (this->now() - keyboard_override_stamp_).seconds() < 0.5;
   }
 
   mutable std::mutex mutex_;
   std::string gimbal_joint_name_;
   double gimbal_spin_speed_{3.14};
   double gimbal_angle_{0.0};
+  bool keyboard_override_{false};
+  rclcpp::Time keyboard_override_stamp_{0, 0, RCL_ROS_TIME};
 
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr chassis_cmd_pub_;
   rclcpp::Publisher<robots_msgs::msg::ChassisOdom>::SharedPtr chassis_odom_pub_;
@@ -122,6 +140,7 @@ private:
   rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr gimbal_cmd_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr wheel_odom_sub_;
   rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr keyboard_override_sub_;
   rclcpp::TimerBase::SharedPtr gimbal_timer_;
 };
 

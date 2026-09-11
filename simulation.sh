@@ -9,7 +9,7 @@ readonly SIM_SETUP="${SIM_WS}/install/setup.bash"
 readonly NAV_SETUP="${NAV_WS}/install/setup.bash"
 
 readonly MODEL_MODE="${MODEL_MODE:-wheel}"
-readonly WHEEL_MODEL_PATH="${WHEEL_MODEL_PATH:-${SIM_WS}/src/seu_sentry_description/resource/xmacro/seu_sentry_sim.sdf.xmacro}"
+readonly WHEEL_MODEL_PATH="${WHEEL_MODEL_PATH:-${SIM_WS}/src/seu_sentry_description/resource/xmacro/new_seu_sentry_sim.sdf.xmacro}"
 readonly WHEEL_RESOURCE_PATH="${WHEEL_RESOURCE_PATH:-${SIM_WS}/src/seu_sentry_description/resource/models}"
 readonly NAMESPACE="${NAMESPACE:-}"
 readonly USE_RVIZ="${USE_RVIZ:-true}"
@@ -154,9 +154,15 @@ shutdown() {
     # gnome-terminal runs its command through the desktop terminal server, so
     # that ROS process is not guaranteed to share the client process group.
     pkill -INT -f '[r]os2 launch nav_bringup navigation_s.launch.py' 2>/dev/null || true
+    pkill -INT -f '[k]eyboard_teleop_node' 2>/dev/null || true
     sleep 2
     stop_process_groups TERM
     pkill -TERM -f '[r]os2 launch nav_bringup navigation_s.launch.py' 2>/dev/null || true
+    pkill -TERM -f '[k]eyboard_teleop_node' 2>/dev/null || true
+    sleep 1
+    stop_process_groups KILL
+    pkill -KILL -f '[r]os2 launch nav_bringup navigation_s.launch.py' 2>/dev/null || true
+    pkill -KILL -f '[k]eyboard_teleop_node' 2>/dev/null || true
     wait "${COMPONENT_PIDS[@]}" 2>/dev/null || true
   fi
 
@@ -168,6 +174,13 @@ cleanup_residual_processes() {
   info "清理上一次运行残留的进程……"
   pkill -INT -f '[r]os2 launch velocity_control' 2>/dev/null || true
   pkill -INT -f '[r]os2 launch nav_bringup' 2>/dev/null || true
+  pkill -INT -f '[r]os2 launch pointcloud_obstacle_layer' 2>/dev/null || true
+  pkill -INT -f '[r]os2 launch fake_vel_transform' 2>/dev/null || true
+  pkill -INT -f '[r]os2 run nav2_map_server' 2>/dev/null || true
+  pkill -INT -f '[r]os2 run localization_initializer' 2>/dev/null || true
+  pkill -INT -f '[r]os2 run small_point_lio' 2>/dev/null || true
+  pkill -INT -f '[r]os2 run tf2_ros static_transform_publisher' 2>/dev/null || true
+  pkill -INT -f '[r]os2 topic echo /initialpose' 2>/dev/null || true
   pkill -INT -f '[l]ivox_ros_driver' 2>/dev/null || true
   pkill -INT -f '[g]z sim' 2>/dev/null || true
   pkill -INT -f '[p]arameter_bridge' 2>/dev/null || true
@@ -175,6 +188,7 @@ cleanup_residual_processes() {
   pkill -INT -f '[p]p2_to_livox_node' 2>/dev/null || true
   pkill -INT -f '[i]mu_alias_node' 2>/dev/null || true
   pkill -INT -f '[w]heel_sim_adapter_node' 2>/dev/null || true
+  pkill -INT -f '[k]eyboard_teleop_node' 2>/dev/null || true
   pkill -INT -f '[s]mall_point_lio' 2>/dev/null || true
   pkill -INT -f '[p]ointcloud_segmentation.*segmentation' 2>/dev/null || true
   pkill -INT -f '[f]ake_vel_transform' 2>/dev/null || true
@@ -182,6 +196,14 @@ cleanup_residual_processes() {
   pkill -INT -f '[b]ridge_node.*clock_bridge' 2>/dev/null || true
   pkill -INT -f '[i]gn_sim_pointcloud_tool' 2>/dev/null || true
   pkill -INT -f '[r]viz2' 2>/dev/null || true
+  pkill -INT -f '[s]tatic_transform_publisher' 2>/dev/null || true
+  pkill -INT -f '[m]ap_server.*initial_pose_map_server' 2>/dev/null || true
+  pkill -INT -f '[p]ointcloud_segmentation_node' 2>/dev/null || true
+  pkill -INT -f '[l]ocal_obstacle_grid_node' 2>/dev/null || true
+  pkill -INT -f '[l]ocalization_initializer_node' 2>/dev/null || true
+  pkill -INT -f '[s]mall_point_lio_node' 2>/dev/null || true
+  pkill -INT -f '[s]werve_sim_controller_node' 2>/dev/null || true
+  pkill -INT -f '[p]p2_to_livox_node' 2>/dev/null || true
   sleep 2
   pkill -TERM -f '[p]ointcloud_segmentation.*segmentation' 2>/dev/null || true
   pkill -TERM -f '[f]ake_vel_transform' 2>/dev/null || true
@@ -190,6 +212,13 @@ cleanup_residual_processes() {
   pkill -TERM -f '[p]p2_to_livox_node' 2>/dev/null || true
   pkill -TERM -f '[i]mu_alias_node' 2>/dev/null || true
   pkill -TERM -f '[w]heel_sim_adapter_node' 2>/dev/null || true
+  pkill -TERM -f '[k]eyboard_teleop_node' 2>/dev/null || true
+  pkill -TERM -f '[s]tatic_transform_publisher' 2>/dev/null || true
+  pkill -TERM -f '[m]ap_server.*initial_pose_map_server' 2>/dev/null || true
+  pkill -TERM -f '[l]ocalization_initializer_node' 2>/dev/null || true
+  pkill -TERM -f '[s]mall_point_lio_node' 2>/dev/null || true
+  pkill -TERM -f '[p]ointcloud_segmentation_node' 2>/dev/null || true
+  pkill -TERM -f '[l]ocal_obstacle_grid_node' 2>/dev/null || true
   sleep 2
   pkill -KILL -f '[p]ointcloud_segmentation.*segmentation' 2>/dev/null || true
   pkill -KILL -f '[f]ake_vel_transform' 2>/dev/null || true
@@ -198,6 +227,13 @@ cleanup_residual_processes() {
   pkill -KILL -f '[p]p2_to_livox_node' 2>/dev/null || true
   pkill -KILL -f '[i]mu_alias_node' 2>/dev/null || true
   pkill -KILL -f '[w]heel_sim_adapter_node' 2>/dev/null || true
+  pkill -KILL -f '[k]eyboard_teleop_node' 2>/dev/null || true
+  pkill -KILL -f '[s]tatic_transform_publisher' 2>/dev/null || true
+  pkill -KILL -f '[m]ap_server.*initial_pose_map_server' 2>/dev/null || true
+  pkill -KILL -f '[l]ocalization_initializer_node' 2>/dev/null || true
+  pkill -KILL -f '[s]mall_point_lio_node' 2>/dev/null || true
+  pkill -KILL -f '[p]ointcloud_segmentation_node' 2>/dev/null || true
+  pkill -KILL -f '[l]ocal_obstacle_grid_node' 2>/dev/null || true
   ros2 daemon stop 9>&- >/dev/null 2>&1 || true
   ros2 daemon start 9>&- >/dev/null 2>&1 || true
 }
@@ -240,6 +276,27 @@ start_terminal_component() {
 
   COMPONENT_PIDS+=("$!")
   COMPONENT_NAMES+=("${name}")
+}
+
+start_untracked_component() {
+  local name="$1"
+  local working_directory="$2"
+  local setup_order="$3"
+  local command="$4"
+
+  info "启动 ${name}（独立终端）"
+  # Keyboard teleop must own a real TTY; a detached background shell makes
+  # stdin non-interactive and the node exits immediately.  Keep this terminal
+  # outside COMPONENT_PIDS so pressing X only releases the override and does
+  # not make the main simulation supervisor shut down.
+  setsid gnome-terminal --title="${name}" -- bash -lc "
+    set -e
+    exec 9>&-
+    cd '${working_directory}'
+    source '${ROS_SETUP}'
+    ${setup_order}
+    exec ${command}
+  " &
 }
 
 wait_for_message() {
@@ -485,6 +542,9 @@ monitor_components() {
 }
 
 main() {
+  # Reap any previous/orphaned simulation before validation or lock checks.
+  # The cleanup patterns are limited to this project's Gazebo/ROS components.
+  cleanup_residual_processes
   check_files
   acquire_simulation_lock
   build_sim_workspace
@@ -509,8 +569,6 @@ main() {
       exit 1
     fi
   done
-  cleanup_residual_processes
-
   start_component \
     "Gazebo 与机器人仿真（${MODEL_MODE}）" \
     "${SIM_WS}" \
@@ -566,6 +624,14 @@ main() {
     "${NAV_WS}" \
     "source ${SIM_SETUP}; source ${NAV_SETUP}; ${nav_prefix}" \
     "ros2 run tf2_ros static_transform_publisher --x 0.04 --y 0.110 --z 0.1 --roll -0.785 --pitch 0 --yaw 0 --frame-id base_link --child-frame-id livox_frame --ros-args -p use_sim_time:=true"
+
+  if [[ "${USE_KEYBOARD}" == "true" ]]; then
+    start_untracked_component \
+      "键盘控制（WASD/JL/QE）" \
+      "${SIM_WS}" \
+      "source ${SIM_SETUP}; source ${NAV_SETUP}; ${nav_prefix}" \
+      "ros2 run velocity_control keyboard_teleop_node --ros-args -p use_sim_time:=true"
+  fi
 
   start_component \
     "Small Point-LIO（仿真话题，不启动 Livox 实车驱动）" \

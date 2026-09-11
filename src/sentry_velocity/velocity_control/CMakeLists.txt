@@ -98,6 +98,13 @@ install(TARGETS wheel_sim_adapter_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(keyboard_teleop_node src/keyboard_teleop.cpp)
+ament_target_dependencies(keyboard_teleop_node geometry_msgs rclcpp std_msgs)
+
+install(TARGETS keyboard_teleop_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY urdf
   DESTINATION share/${PROJECT_NAME}/
 )

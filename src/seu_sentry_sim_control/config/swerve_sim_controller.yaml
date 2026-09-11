@@ -8,9 +8,9 @@ swerve_sim_controller:
     wheel_radius: 0.0535
     max_wheel_angular_speed: 50.0
 
-    # Module centers in the chassis frame, taken from the current SDF.
-    module_x: [-0.159, 0.159, -0.12850788, 0.18596]
-    module_y: [-0.159, -0.159, 0.159, 0.17216]
+    # Module centers in the SDF chassis frame (the source CAD frame).
+    module_x: [-0.159, 0.159, -0.159, 0.159]
+    module_y: [-0.159, -0.159, 0.159, 0.159]
     steer_joint_names:
       [front_left_steer_joint, front_right_steer_joint,
        rear_left_steer_joint, rear_right_steer_joint]
@@ -18,7 +18,7 @@ swerve_sim_controller:
       [front_left_wheel_joint, front_right_wheel_joint,
        rear_left_wheel_joint, rear_right_wheel_joint]
 
-    # raw_joint_angle + steer_zero_offset = physical rolling direction.
-    # These offsets follow the wheel-axis poses exported by the current CAD model.
-    steer_zero_offsets: [-0.785399, -0.785396, 0.0, -0.785398]
+    # physical_direction = raw_joint_angle + steer_zero_offset in the SDF frame.
+    steer_direction_signs: [1.0, 1.0, 1.0, 1.0]
+    steer_zero_offsets: [-0.785398, 0.785398, -2.356194, 2.356194]
     drive_signs: [1.0, 1.0, 1.0, 1.0]

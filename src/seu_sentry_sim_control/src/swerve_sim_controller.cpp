@@ -45,6 +45,7 @@ struct Module
   std::string wheel_joint;
   double x{0.0};
   double y{0.0};
+  double steer_direction_sign{1.0};
   double steer_zero_offset{0.0};
   double drive_sign{1.0};
   double steer_position{0.0};
@@ -69,10 +70,10 @@ public:
 
     const auto module_x = to_array(
       declare_parameter<std::vector<double>>(
-        "module_x", {-0.159, 0.159, -0.12850788, 0.18596}), "module_x");
+        "module_x", {-0.159, 0.159, -0.159, 0.159}), "module_x");
     const auto module_y = to_array(
       declare_parameter<std::vector<double>>(
-        "module_y", {-0.159, -0.159, 0.159, 0.17216}), "module_y");
+        "module_y", {-0.159, -0.159, 0.159, 0.159}), "module_y");
     const auto steer_names = to_array(
       declare_parameter<std::vector<std::string>>(
         "steer_joint_names",
@@ -85,9 +86,13 @@ public:
         {"front_left_wheel_joint", "front_right_wheel_joint",
           "rear_left_wheel_joint", "rear_right_wheel_joint"}),
       "wheel_joint_names");
+    const auto direction_signs = to_array(
+      declare_parameter<std::vector<double>>(
+        "steer_direction_signs", {1.0, 1.0, 1.0, 1.0}),
+      "steer_direction_signs");
     const auto zero_offsets = to_array(
       declare_parameter<std::vector<double>>(
-        "steer_zero_offsets", {-0.785399, -0.785396, 0.0, -0.785398}),
+        "steer_zero_offsets", {-0.785398, 0.785398, -2.356194, 2.356194}),
       "steer_zero_offsets");
     const auto drive_signs = to_array(
       declare_parameter<std::vector<double>>("drive_signs", {1.0, 1.0, 1.0, 1.0}),
@@ -99,6 +104,7 @@ public:
       modules_[i].wheel_joint = wheel_names[i];
       modules_[i].x = module_x[i];
       modules_[i].y = module_y[i];
+      modules_[i].steer_direction_sign = direction_signs[i];
       modules_[i].steer_zero_offset = zero_offsets[i];
       modules_[i].drive_sign = drive_signs[i];
       steer_publishers_[i] = create_publisher<std_msgs::msg::Float64>(
@@ -133,6 +139,11 @@ private:
     }
     if (max_wheel_speed_ <= 0.0 || !std::isfinite(max_wheel_speed_)) {
       throw std::runtime_error("max_wheel_angular_speed must be finite and positive");
+    }
+    for (const auto & module : modules_) {
+      if (std::abs(module.steer_direction_sign) != 1.0) {
+        throw std::runtime_error("steer_direction_signs entries must be either -1 or 1");
+      }
     }
   }
 
@@ -188,16 +199,22 @@ private:
 
   void calculate_commands(double vx, double vy, double wz)
   {
+    // sentry2026 uses +X forward/+Y left. The CAD/SDF chassis uses -Y
+    // forward/-X left, so transform the command before applying SDF module
+    // positions and invert yaw for the reflected frame.
+    const double sdf_vx = -vy;
+    const double sdf_vy = -vx;
+    const double sdf_wz = -wz;
     double greatest_wheel_speed = 0.0;
     for (auto & module : modules_) {
       // General form of the sentry2026 inverse kinematics. Per-module positions
       // replace the embedded controller's square-chassis wR shortcut.
-      const double module_vx = vx - wz * module.y;
-      const double module_vy = vy + wz * module.x;
+      const double module_vx = sdf_vx - sdf_wz * module.y;
+      const double module_vy = sdf_vy + sdf_wz * module.x;
       double target_direction = std::atan2(module_vy, module_vx);
       double target_speed = std::hypot(module_vx, module_vy) / wheel_radius_;
       const double current_direction =
-        module.steer_position + module.steer_zero_offset;
+        module.steer_direction_sign * module.steer_position + module.steer_zero_offset;
       const double direction_error = normalize_angle(target_direction - current_direction);
 
       // sentry2026 Judge_Reverse: reverse the wheel instead of steering over 90 degrees.
@@ -205,7 +222,8 @@ private:
         target_direction = normalize_angle(target_direction + kPi);
         target_speed = -target_speed;
       }
-      const double raw_target = target_direction - module.steer_zero_offset;
+      const double raw_target =
+        (target_direction - module.steer_zero_offset) / module.steer_direction_sign;
       module.steer_command =
         module.steer_position + normalize_angle(raw_target - module.steer_position);
       module.wheel_command = module.drive_sign * target_speed;

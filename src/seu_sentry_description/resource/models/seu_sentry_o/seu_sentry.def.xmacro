@@ -11,7 +11,7 @@
         </inertia>
       </inertial>
       <visual name="chassis_visual">
-        <geometry><mesh><uri>model://seu_sentry/meshes/chassis.STL</uri></mesh></geometry>
+        <geometry><mesh><uri>model://seu_sentry_o/meshes/chassis.STL</uri></mesh></geometry>
       </visual>
       <collision name="chassis_main_collision">
         <pose>0 0 -0.105 0 0 0</pose>
@@ -45,7 +45,7 @@
         </inertia>
       </inertial>
       <visual name="base_link_visual">
-        <geometry><mesh><uri>model://seu_sentry/meshes/base_link.STL</uri></mesh></geometry>
+        <geometry><mesh><uri>model://seu_sentry_o/meshes/base_link.STL</uri></mesh></geometry>
       </visual>
       <collision name="base_link_collision">
         <pose>0.003 0.0535 0.108 0 0 0</pose>
@@ -72,7 +72,7 @@
       <inertial><pose>0.01453352 0.01543949 -0.06179294 0 0 0</pose><mass>0.45064</mass><inertia>
         <ixx>0.00047955</ixx><ixy>-0.00004228</ixy><ixz>0.00006147</ixz><iyy>0.00048464</iyy><iyz>0.00004548</iyz><izz>0.00029600</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/front_left_steer_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/front_left_steer_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>0.008 0.008 -0.057 0 0 0</pose><geometry><cylinder><radius>0.048</radius><length>0.098</length></cylinder></geometry></collision>
     </link>
     <joint name="front_left_wheel_joint" type="revolute">
@@ -85,7 +85,7 @@
       <inertial><pose>-0.02200184 -0.00010585 0.02151537 0 0 0</pose><mass>0.1138</mass><inertia>
         <ixx>0.00013393</ixx><ixy>-0.00000035</ixy><ixz>-0.00002843</ixz><iyy>0.00010604</iyy><iyz>0.00000008</iyz><izz>0.00013457</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/front_left_wheel_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/front_left_wheel_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>-0.0220 0 0.0215 0 -0.7895 0</pose><geometry><cylinder><radius>0.0535</radius><length>0.050</length></cylinder></geometry></collision>
     </link>
 
@@ -99,7 +99,7 @@
       <inertial><pose>-0.01596977 0.01496306 -0.06017100 0 0 0</pose><mass>0.44578</mass><inertia>
         <ixx>0.00049633</ixx><ixy>0.00004787</ixy><ixz>-0.00005383</ixz><iyy>0.00049031</iyy><iyz>0.00007068</iyz><izz>0.00030177</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/front_right_steer_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/front_right_steer_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>-0.008 0.008 -0.057 0 0 0</pose><geometry><cylinder><radius>0.048</radius><length>0.098</length></cylinder></geometry></collision>
     </link>
     <joint name="front_right_wheel_joint" type="revolute">
@@ -112,7 +112,7 @@
       <inertial><pose>-0.00024171 -0.00008245 0.03169489 0 0 0</pose><mass>0.10651</mass><inertia>
         <ixx>0.00010189</ixx><ixy>-0.00000016</ixy><ixz>0.00000057</ixz><iyy>0.00010220</iyy><iyz>0.00000022</iyz><izz>0.00015775</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/front_right_wheel_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/front_right_wheel_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>-0.00024 -0.00008 0.03169 0 -1.5708 0</pose><geometry><cylinder><radius>0.0535</radius><length>0.050</length></cylinder></geometry></collision>
     </link>
 
@@ -126,7 +126,7 @@
       <inertial><pose>-0.04192277 -0.02912364 -0.06317113 0 0 0</pose><mass>0.44578</mass><inertia>
         <ixx>0.00049032</ixx><ixy>-0.00004788</ixy><ixz>-0.00007067</ixz><iyy>0.00049634</iyy><iyz>-0.00005382</iyz><izz>0.00030180</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/rear_right_steer_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/rear_right_steer_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>-0.035 -0.021 -0.060 0 0 0</pose><geometry><cylinder><radius>0.048</radius><length>0.098</length></cylinder></geometry></collision>
     </link>
     <joint name="rear_right_wheel_joint" type="revolute">
@@ -139,7 +139,7 @@
       <inertial><pose>0.02387269 -0.00009308 -0.02348800 0 0 0</pose><mass>0.094659</mass><inertia>
         <ixx>0.00011395</ixx><ixy>0.00000026</ixy><ixz>-0.00002462</ixz><iyy>0.00009017</iyy><iyz>-0.00000003</iyz><izz>0.00011500</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/rear_right_wheel_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/rear_right_wheel_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>0.02387 -0.00009 -0.02349 0 -0.7854 0</pose><geometry><cylinder><radius>0.0535</radius><length>0.050</length></cylinder></geometry></collision>
     </link>
 
@@ -153,7 +153,7 @@
       <inertial><pose>-0.01452159 -0.01496531 -0.06482123 0 0 0</pose><mass>0.45</mass><inertia>
         <ixx>0.00050102</ixx><ixy>0.00004832</ixy><ixz>0.00005435</ixz><iyy>0.00049494</iyy><iyz>-0.00007135</iyz><izz>0.00030461</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/rear_left_steer_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/rear_left_steer_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>-0.023 -0.008 -0.062 0 0 0</pose><geometry><cylinder><radius>0.048</radius><length>0.098</length></cylinder></geometry></collision>
     </link>
     <joint name="rear_left_wheel_joint" type="revolute">
@@ -166,7 +166,7 @@
       <inertial><pose>-0.00027202 -0.00009309 0.03348907 0 0 0</pose><mass>0.094659</mass><inertia>
         <ixx>0.00008986</ixx><ixy>-0.00000016</ixy><ixz>0.00000053</ixz><iyy>0.00009017</iyy><iyz>0.00000021</iyz><izz>0.00013909</izz>
       </inertia></inertial>
-      <visual name="visual"><geometry><mesh><uri>model://seu_sentry/meshes/rear_left_wheel_link.STL</uri></mesh></geometry></visual>
+      <visual name="visual"><geometry><mesh><uri>model://seu_sentry_o/meshes/rear_left_wheel_link.STL</uri></mesh></geometry></visual>
       <collision name="collision"><pose>-0.00027 -0.00009 0.03349 0 2.3562 0</pose><geometry><cylinder><radius>0.0535</radius><length>0.050</length></cylinder></geometry></collision>
     </link>
   </xmacro_define_block>

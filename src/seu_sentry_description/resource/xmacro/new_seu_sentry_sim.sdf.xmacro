@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <sdf version="1.11">
-  <xmacro_include uri="model://seu_sentry/seu_sentry.def.xmacro"/>
+  <xmacro_include uri="model://new_seu_sentry/seu_sentry.def.xmacro"/>
   <xmacro_include uri="model://mid360/model.sdf.xmacro"/>
 
-  <model name="seu_sentry">
+  <model name="new_seu_sentry">
     <!-- Spawn height is supplied by the launch file; keep this model-local pose neutral. -->
     <pose>0 0 0 0 0 0</pose>
-    <xmacro_block name="seu_sentry"/>
+    <xmacro_block name="new_seu_sentry"/>
 
     <!-- One Mid360 only. It is mounted beside the gimbal and follows yaw. -->
     <xmacro_block name="livox"
