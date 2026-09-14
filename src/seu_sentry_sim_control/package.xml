@@ -7,9 +7,13 @@
   <maintainer email="dengjiaxi@todo.todo">dengjiaxi</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>gz_sim_vendor</build_depend>
+  <build_depend>gz_plugin_vendor</build_depend>
+  <build_depend>gz_transport_vendor</build_depend>
   <depend>geometry_msgs</depend>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <exec_depend>gz_sim_vendor</exec_depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>

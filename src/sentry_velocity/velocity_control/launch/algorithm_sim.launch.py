@@ -105,14 +105,6 @@ def _launch_setup(context):
     actions = [SetEnvironmentVariable("ROS_STACK_SIZE", "16777216")]
     actions.extend(_make_action(spec) for spec in profile.get("actions", []))
 
-    # Select navigation only after the mux is already running in the simulator.
-    actions.append(Node(
-        package="velocity_control",
-        executable="control_mode_once_node",
-        name="select_navigation_mode",
-        output="screen",
-        parameters=[{"mode": "navigation", "use_sim_time": True}],
-    ))
     return actions
 
 
@@ -122,13 +114,6 @@ def generate_launch_description():
             "profile",
             default_value="navigationros2",
             description="YAML profile name from config/algorithm_profiles",
-        ),
-        DeclareLaunchArgument(
-            "map",
-            default_value=os.path.join(
-                get_package_share_directory("mybringup"), "map", "RMUC.yaml"
-            ),
-            description="Map YAML passed to the selected navigation stack",
         ),
         OpaqueFunction(function=_launch_setup),
     ])

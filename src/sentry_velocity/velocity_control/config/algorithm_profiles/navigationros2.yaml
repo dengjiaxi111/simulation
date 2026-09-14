@@ -8,55 +8,34 @@ required_packages:
   - nav2_controller
   - nav2_bt_navigator
   - nav2_behaviors
+  - nav2_lifecycle_manager
+  - rviz2
 
 actions:
-  # LIO data products are used, but its hard-coded physical TF is isolated.
+  # LIO owns odom -> base_link and consumes the simulated Livox topics.
   - type: node
-    package: small_point_lio
-    executable: small_point_lio_node
+    package: velocity_control
+    executable: lio_after_tf.py
     name: small_point_lio
     delay: 1.5
     parameters:
-      - package://small_point_lio/config/mid360_sim.yaml
+      - lio_params_file: package://small_point_lio/config/mid360_sim.yaml
       - lidar_frame: livox_frame
-        save_pcd: false
-    remappings:
-      - [/tf, /navigationros2/lio_tf]
+        base_frame: base_link
+        # save_pcd remains owned by mid360_sim.yaml and the algorithm.
 
-  # The algorithm expects this virtual planning-frame anchor. The simulator
-  # remains the only publisher of odom -> chassis -> base_link.
+  # Keep map available before localization with an identity map->odom.  The
+  # first RViz /initialpose updates that transform and then enables navigation.
   - type: node
-    package: tf2_ros
-    executable: static_transform_publisher
-    name: base_link_static_for_navigationros2
-    arguments:
-      - --x
-      - "0"
-      - --y
-      - "0"
-      - --z
-      - "0"
-      - --roll
-      - "0"
-      - --pitch
-      - "0"
-      - --yaw
-      - "0"
-      - --frame-id
-      - base_link
-      - --child-frame-id
-      - base_link_static
-
-  # Use RViz /initialpose to publish map -> odom; no hard-coded PCD path is used.
-  - type: node
-    package: mybringup
-    executable: initialpose_static_tf_node.py
-    name: initialpose_static_tf
+    package: velocity_control
+    executable: navigation_initialpose_gate.py
+    name: navigation_initialpose_gate
     parameters:
       - map_frame: map
         odom_frame: odom
         base_frame: base_link
         initialpose_topic: /initialpose
+        base_height_offset: 0.7
 
   - type: include
     launch: package://pointcloud_segmentation/launch/segmentation.launch.py
@@ -75,9 +54,19 @@ actions:
     package: nav2_map_server
     executable: map_server
     name: map_server
-    delay: 3.0
     parameters:
-      - yaml_filename: {launch_argument: map}
+      - yaml_filename: package://mybringup/map/RMUC.yaml
+
+  # Activate the static map independently.  Planner/controller startup must
+  # never be able to hold /map in the inactive lifecycle state.
+  - type: node
+    package: nav2_lifecycle_manager
+    executable: lifecycle_manager
+    name: map_lifecycle_manager
+    delay: 0.5
+    parameters:
+      - autostart: true
+      - node_names: [map_server]
 
   - type: lifecycle_node
     package: nav2_planner
@@ -125,16 +114,16 @@ actions:
   - type: node
     package: nav2_lifecycle_manager
     executable: lifecycle_manager
-    name: lifecycle_manager
-    delay: 4.0
+    name: navigation_lifecycle_manager
+    delay: 5.0
     parameters:
       - autostart: true
-        node_names: [map_server, controller_server, planner_server, bt_navigator, behavior_server]
+      - node_names: [controller_server, planner_server, bt_navigator, behavior_server]
 
   - type: node
-    package: rviz2
-    executable: rviz2
-    name: rviz2
-    arguments:
-      - -d
-      - package://mybringup/rviz/nav.rviz
+    package: velocity_control
+    executable: rviz_after_map.py
+    name: rviz_after_map
+    parameters:
+      - map_topic: /map
+        rviz_config: package://velocity_control/config/navigationros2_sim.rviz

@@ -123,6 +123,14 @@ install(TARGETS control_mode_once_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/navigation_initialpose_gate.py
+  scripts/rviz_after_map.py
+  scripts/startup_pose_release.py
+  scripts/lio_after_tf.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 add_executable(keyboard_teleop_node src/keyboard_teleop.cpp)
 ament_target_dependencies(keyboard_teleop_node geometry_msgs rclcpp std_msgs)
 

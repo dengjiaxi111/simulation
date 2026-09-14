@@ -10,6 +10,9 @@ find_package(geometry_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(gz-sim8 REQUIRED)
+find_package(gz-plugin2-register REQUIRED)
+find_package(gz-transport13 REQUIRED)
 
 add_executable(swerve_sim_controller_node src/swerve_sim_controller.cpp)
 ament_target_dependencies(swerve_sim_controller_node
@@ -17,6 +20,13 @@ ament_target_dependencies(swerve_sim_controller_node
 )
 
 install(TARGETS swerve_sim_controller_node DESTINATION lib/${PROJECT_NAME})
+add_library(startup_pose_lock SHARED src/startup_pose_lock.cpp)
+target_link_libraries(startup_pose_lock
+  gz-sim8::gz-sim8
+  gz-plugin2::register
+  gz-transport13::gz-transport13
+)
+install(TARGETS startup_pose_lock LIBRARY DESTINATION lib)
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
 
 ament_package()

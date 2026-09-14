@@ -10,7 +10,11 @@ from launch.actions import (
 from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
+from ament_index_python.packages import (
+    get_package_prefix,
+    get_package_share_directory,
+    PackageNotFoundError,
+)
 import os
 import tempfile
 import math
@@ -26,6 +30,17 @@ WHEEL_RESOURCE_DEFAULT = (
     "seu_sentry_description/resource/models"
 )
 WHEEL_SPAWN_Z_DEFAULT = "0.670"
+
+# Force Gazebo's GUI / OGRE renderer onto the discrete NVIDIA GLX provider on
+# hybrid-GPU systems.  QT_XCB_GL_INTEGRATION avoids Qt selecting an AMD EGL
+# device before OGRE creates its rendering context.
+NVIDIA_RENDER_ENV = {
+    "__NV_PRIME_RENDER_OFFLOAD": "1",
+    "__GLX_VENDOR_LIBRARY_NAME": "nvidia",
+    "__VK_LAYER_NV_optimus": "NVIDIA_only",
+    "CUDA_VISIBLE_DEVICES": "0",
+    "QT_XCB_GL_INTEGRATION": "xcb_glx",
+}
 
 
 def _existing_paths(paths):
@@ -120,6 +135,8 @@ def _patch_wheel_sdf(robot_xml):
             specular.text = "0.55 0.58 0.62 1"
 
     for plugin in model.findall("plugin"):
+        if plugin.get("filename") == "libstartup_pose_lock.so":
+            continue
         if plugin.get("filename") == "gz-sim-joint-controller-system":
             joint_name = plugin.find("joint_name")
             if joint_name is not None and joint_name.text == "gimbal_yaw_joint":
@@ -153,6 +170,12 @@ def _patch_wheel_sdf(robot_xml):
             element = ET.SubElement(plugin, key)
             element.text = value
 
+    startup_lock = ET.SubElement(model, "plugin", {
+        "filename": "libstartup_pose_lock.so",
+        "name": "seu_sentry_sim_control::StartupPoseLock",
+    })
+    ET.SubElement(startup_lock, "release_topic").text = "/simulation/robot_release"
+
     return ET.tostring(root, encoding="unicode")
 
 
@@ -178,18 +201,15 @@ def _reroot_wheel_urdf(robot_xml):
                 (sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr),
                 (-sp, cp * sr, cp * cr))
 
-    def inverse_origin(joint):
-        t = xyz(joint, "origin")
-        roll, pitch, yaw = rpy(joint, "origin")
-        R = mat_from_rpy(roll, pitch, yaw)
-        inv_t = tuple(-sum(R[k][i] * t[k] for k in range(3)) for i in range(3))
-        # URDF's fixed-axis RPY extraction for the inverse rotation.
-        inv_roll = math.atan2(R[1][2], R[2][2])
-        inv_pitch = math.asin(max(-1.0, min(1.0, -R[0][2])))
-        inv_yaw = math.atan2(R[0][1], R[0][0])
-        return inv_t, (inv_roll, inv_pitch, inv_yaw)
-
-    inverse_t, inverse_rpy = inverse_origin(yaw_joint)
+    t = xyz(yaw_joint, "origin")
+    roll, pitch, yaw = rpy(yaw_joint, "origin")
+    rotation = mat_from_rpy(roll, pitch, yaw)
+    inverse_t = tuple(-sum(rotation[k][i] * t[k] for k in range(3)) for i in range(3))
+    inverse_rpy = (
+        math.atan2(rotation[1][2], rotation[2][2]),
+        math.asin(max(-1.0, min(1.0, -rotation[0][2]))),
+        math.atan2(rotation[0][1], rotation[0][0]),
+    )
 
     remove_joints = {
         "base_to_chassis",
@@ -197,20 +217,16 @@ def _reroot_wheel_urdf(robot_xml):
         "gimbal_pitch_odom_joint",
         "gimbal_yaw_joint",
     }
-    # Sensors are published by Navigation2026's single base_link->livox_frame
-    # extrinsic TF. Do not let the RViz URDF publish a second Livox branch.
-    remove_links = {"gimbal_yaw_odom", "gimbal_pitch_odom", "gimbal_yaw", "livox_frame"}
-    remove_links.update(
-        element.get("name") for element in root.findall("./link")
-        if any(token in element.get("name", "").lower() for token in ("livox", "lidar", "imu"))
-    )
+    # Keep livox_frame in the URDF so robot_state_publisher emits the
+    # simulator-owned base_link -> livox_frame extrinsic.
+    remove_links = {"gimbal_yaw_odom", "gimbal_pitch_odom", "gimbal_yaw"}
     for element in list(root):
         if (element.tag == "joint" and element.get("name") in remove_joints) or (
             element.tag == "link" and element.get("name") in remove_links
         ):
             root.remove(element)
 
-    # Remove joints attached to links removed above (the sensor branch).
+    # Remove joints attached to the legacy virtual links.
     for joint in list(root.findall("./joint")):
         parent = joint.find("parent")
         child = joint.find("child")
@@ -218,13 +234,17 @@ def _reroot_wheel_urdf(robot_xml):
                 (child is not None and child.get("link") in remove_links)):
             root.remove(joint)
 
-    yaw_joint = ET.SubElement(root, "joint", name="gimbal_yaw_joint", type="continuous")
-    ET.SubElement(yaw_joint, "origin",
+    # The algorithm publishes odom -> base_link.  Keep base_link as the sole
+    # parent of the visual chassis branch, rather than publishing a second
+    # chassis -> base_link parent in the simulator.
+    reversed_yaw = ET.SubElement(root, "joint", name="gimbal_yaw_joint", type="continuous")
+    ET.SubElement(reversed_yaw, "origin",
                   xyz="%.9g %.9g %.9g" % inverse_t,
                   rpy="%.9g %.9g %.9g" % inverse_rpy)
-    ET.SubElement(yaw_joint, "parent", link="base_link")
-    ET.SubElement(yaw_joint, "child", link="chassis")
-    ET.SubElement(yaw_joint, "axis", xyz="0 0 -1")
+    ET.SubElement(reversed_yaw, "parent", link="base_link")
+    ET.SubElement(reversed_yaw, "child", link="chassis")
+    ET.SubElement(reversed_yaw, "axis", xyz="0 0 -1")
+
     return ET.tostring(root, encoding="unicode")
 
 
@@ -293,6 +313,12 @@ def launch_setup(context):
         os.path.join("/opt/ros", ros_distro, "lib"),
         gz_vendor_plugin_path,
     ]
+    try:
+        system_plugin_paths.append(
+            os.path.join(get_package_prefix("seu_sentry_sim_control"), "lib")
+        )
+    except PackageNotFoundError:
+        pass
 
     environment = _prepend_env("GZ_SIM_RESOURCE_PATH", resource_paths)
     ignition_resource_environment = _prepend_env("IGN_GAZEBO_RESOURCE_PATH", resource_paths)
@@ -303,6 +329,7 @@ def launch_setup(context):
     gazebo = ExecuteProcess(
         cmd=["gz", "sim", "-r", world_file, "--verbose"],
         output="screen",
+        additional_env=NVIDIA_RENDER_ENV,
     )
 
     actions = [
@@ -434,9 +461,26 @@ def launch_setup(context):
         )
         if robot_state_publisher is not None:
             actions.append(robot_state_publisher)
+        startup_pose_release = Node(
+            package="velocity_control",
+            executable="startup_pose_release.py",
+            name="startup_pose_release",
+            output="screen",
+            parameters=[{"use_sim_time": True}],
+        )
+        startup_pose_release_bridge = Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            name="startup_pose_release_bridge",
+            arguments=["/simulation/robot_release@std_msgs/msg/Bool@gz.msgs.Boolean"],
+            output="screen",
+            parameters=[{"use_sim_time": True}],
+        )
         actions += [
             TimerAction(period=3.0, actions=[spawn_robot]),
             bridge_cmd_vel,
+            startup_pose_release_bridge,
+            startup_pose_release,
             swerve_sim_controller,
         ]
         if enable_motion_adapter.lower() == "true":
