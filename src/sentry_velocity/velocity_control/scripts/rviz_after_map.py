@@ -3,6 +3,7 @@
 """Start the simulation RViz only after the latched static map is available."""
 
 import os
+import time
 
 import rclpy
 from nav_msgs.msg import OccupancyGrid
@@ -15,6 +16,7 @@ class MapWaiter(Node):
         super().__init__("rviz_after_map")
         self.declare_parameter("map_topic", "/map")
         self.declare_parameter("rviz_config", "")
+        self.declare_parameter("map_wait_timeout", 20.0)
         self.map_received = False
 
         topic = self.get_parameter("map_topic").value
@@ -36,15 +38,23 @@ def main(args=None):
     rclpy.init(args=args)
     node = MapWaiter()
     rviz_config = node.get_parameter("rviz_config").value
+    timeout = float(node.get_parameter("map_wait_timeout").value)
+    # Use wall time for the watchdog.  The simulated clock may be stopped
+    # while Gazebo is still coming up, and must not disable this fallback.
+    start = time.monotonic()
     while rclpy.ok() and not node.map_received:
         rclpy.spin_once(node, timeout_sec=0.25)
+        if timeout > 0.0:
+            elapsed = time.monotonic() - start
+            if elapsed >= timeout:
+                node.get_logger().error(
+                    f"No map received on {node.get_parameter('map_topic').value} "
+                    f"after {timeout:.1f}s; opening RViz anyway for diagnosis"
+                )
+                break
 
-    if not node.map_received:
-        node.destroy_node()
-        rclpy.shutdown()
-        return
-
-    node.get_logger().info("Static map received; opening RViz")
+    if node.map_received:
+        node.get_logger().info("Static map received; opening RViz")
     node.destroy_node()
     rclpy.shutdown()
     command = ["rviz2"]

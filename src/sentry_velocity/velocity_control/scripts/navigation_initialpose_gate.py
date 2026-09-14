@@ -74,10 +74,6 @@ class NavigationInitialPoseGate(Node):
         self.declare_parameter("initialpose_topic", "/initialpose")
         self.declare_parameter("mode_topic", "/control_mode")
         self.declare_parameter("tf_publish_rate", 20.0)
-        # The simulator's base_link is the elevated gimbal / LiDAR reference
-        # frame.  Keep the 2-D initial pose semantics while lifting the RViz
-        # robot model above the map plane by this amount.
-        self.declare_parameter("base_height_offset", 0.7)
 
         self.map_frame = self.get_parameter("map_frame").value
         self.odom_frame = self.get_parameter("odom_frame").value
@@ -85,9 +81,6 @@ class NavigationInitialPoseGate(Node):
         initialpose_topic = self.get_parameter("initialpose_topic").value
         mode_topic = self.get_parameter("mode_topic").value
         publish_rate = float(self.get_parameter("tf_publish_rate").value)
-        self.base_height_offset = float(
-            self.get_parameter("base_height_offset").value
-        )
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -112,7 +105,7 @@ class NavigationInitialPoseGate(Node):
             (
                 pose.position.x,
                 pose.position.y,
-                pose.position.z + self.base_height_offset,
+                pose.position.z,
             ),
             (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w),
         )

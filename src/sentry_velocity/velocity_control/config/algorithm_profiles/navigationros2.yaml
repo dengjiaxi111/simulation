@@ -35,7 +35,6 @@ actions:
         odom_frame: odom
         base_frame: base_link
         initialpose_topic: /initialpose
-        base_height_offset: 0.7
 
   - type: include
     launch: package://pointcloud_segmentation/launch/segmentation.launch.py
@@ -54,6 +53,11 @@ actions:
     package: nav2_map_server
     executable: map_server
     name: map_server
+    # Keep the static map independent and self-healing.  If the first
+    # map_server process loses DDS discovery during a stale-process cleanup,
+    # launch_ros recreates it and the dedicated lifecycle manager activates it.
+    respawn: true
+    respawn_delay: 2.0
     parameters:
       - yaml_filename: package://mybringup/map/RMUC.yaml
 

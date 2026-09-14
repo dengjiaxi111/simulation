@@ -10,9 +10,11 @@ from launch.actions import (
     GroupAction,
     IncludeLaunchDescription,
     OpaqueFunction,
+    RegisterEventHandler,
     SetEnvironmentVariable,
     TimerAction,
 )
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import LifecycleNode, Node, SetRemap
@@ -63,6 +65,23 @@ def _make_action(spec):
     elif action_type in ("node", "lifecycle_node"):
         node_class = LifecycleNode if action_type == "lifecycle_node" else Node
         parameters = [_resolve(item) for item in spec.get("parameters", [])]
+        if (
+            spec.get("package") == "nav2_map_server"
+            and spec.get("executable") == "map_server"
+        ):
+            map_files = [
+                parameter.get("yaml_filename")
+                for parameter in parameters
+                if isinstance(parameter, dict) and "yaml_filename" in parameter
+            ]
+            if not map_files or not isinstance(map_files[0], str):
+                raise RuntimeError(
+                    "navigationros2 map_server requires a yaml_filename parameter"
+                )
+            if not os.path.isfile(map_files[0]):
+                raise RuntimeError(
+                    f"navigationros2 map file does not exist: {map_files[0]}"
+                )
         # Simulation time is enforced for every algorithm-side node.
         parameters.append({"use_sim_time": True})
         kwargs = {
@@ -75,6 +94,13 @@ def _make_action(spec):
             "remappings": remappings,
             "arguments": [_resolve(arg) for arg in spec.get("arguments", [])],
         }
+        # Map/lifecycle nodes are external processes.  A transient DDS or
+        # startup failure must not leave the rest of the algorithm running
+        # forever without /map.  Profiles can opt into launch_ros' respawn
+        # without changing the algorithm node itself.
+        if spec.get("respawn", False):
+            kwargs["respawn"] = True
+            kwargs["respawn_delay"] = float(spec.get("respawn_delay", 2.0))
         action = node_class(**kwargs)
     else:
         raise RuntimeError(f"Unsupported profile action type: {action_type}")
@@ -103,7 +129,45 @@ def _launch_setup(context):
         get_package_share_directory(package)
 
     actions = [SetEnvironmentVariable("ROS_STACK_SIZE", "16777216")]
-    actions.extend(_make_action(spec) for spec in profile.get("actions", []))
+
+    # LIO is intentionally allowed to start as soon as its static sensor
+    # extrinsic is available.  Only Nav2 activation waits for the complete
+    # dynamic chain produced afterwards:
+    # odom -> base_link -> base_link_static -> base_link_fake.
+    navigation_manager_action = None
+    navigation_tf_gate = None
+    for spec in profile.get("actions", []):
+        if (
+            spec.get("type") == "node"
+            and spec.get("name") == "navigation_lifecycle_manager"
+        ):
+            navigation_manager_action = _make_action(spec)
+            navigation_tf_gate = Node(
+                package="velocity_control",
+                executable="wait_for_tf.py",
+                name="navigation_tf_gate",
+                output="screen",
+                parameters=[
+                    {
+                        "target_frame": "odom",
+                        "source_frame": "base_link_fake",
+                        "use_sim_time": True,
+                    }
+                ],
+            )
+            actions.append(navigation_tf_gate)
+            continue
+        actions.append(_make_action(spec))
+
+    if navigation_manager_action is not None:
+        actions.append(
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=navigation_tf_gate,
+                    on_exit=[navigation_manager_action],
+                )
+            )
+        )
 
     return actions
 

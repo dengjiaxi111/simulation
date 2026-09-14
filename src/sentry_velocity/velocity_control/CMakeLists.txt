@@ -128,6 +128,7 @@ install(PROGRAMS
   scripts/rviz_after_map.py
   scripts/startup_pose_release.py
   scripts/lio_after_tf.py
+  scripts/wait_for_tf.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
