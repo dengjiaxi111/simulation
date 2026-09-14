@@ -25,7 +25,7 @@ WHEEL_RESOURCE_DEFAULT = (
     "/home/dengjiaxi/simulation_seu/navigationsim/src/"
     "seu_sentry_description/resource/models"
 )
-WHEEL_SPAWN_Z_DEFAULT = "0.600"
+WHEEL_SPAWN_Z_DEFAULT = "0.670"
 
 
 def _existing_paths(paths):
@@ -404,7 +404,26 @@ def launch_setup(context):
             executable="wheel_sim_adapter_node",
             name="wheel_sim_adapter",
             output="screen",
-            parameters=[{"use_sim_time": True, "gimbal_spin_speed": 3.14}],
+            parameters=[{"use_sim_time": True}],
+        )
+        cmd_vel_mux_config_path = os.path.join(
+            get_package_share_directory("velocity_control"),
+            "config",
+            "cmd_vel_mux.yaml",
+        )
+        cmd_vel_mux = Node(
+            package="velocity_control",
+            executable="cmd_vel_mux_node",
+            name="cmd_vel_mux",
+            output="screen",
+            parameters=[cmd_vel_mux_config_path, {"use_sim_time": True}],
+        )
+        keyboard_sim_adapter = Node(
+            package="velocity_control",
+            executable="keyboard_sim_adapter_node",
+            name="keyboard_sim_adapter",
+            output="screen",
+            parameters=[{"use_sim_time": True}],
         )
         swerve_sim_controller = Node(
             package="seu_sentry_sim_control",
@@ -421,7 +440,7 @@ def launch_setup(context):
             swerve_sim_controller,
         ]
         if enable_motion_adapter.lower() == "true":
-            actions.append(wheel_sim_adapter)
+            actions.extend([wheel_sim_adapter, keyboard_sim_adapter, cmd_vel_mux])
     else:
         raise RuntimeError(f"Unsupported model_mode: {model_mode}")
 

@@ -1,0 +1,9 @@
+cmd_vel_mux:
+  ros__parameters:
+    default_mode: keyboard
+    navigation_topic: /navigation/cmd_vel
+    keyboard_topic: /keyboard/cmd_vel
+    output_topic: /cmd_vel_chassis
+    mode_topic: /control_mode
+    command_timeout: 0.25
+    publish_rate: 50.0

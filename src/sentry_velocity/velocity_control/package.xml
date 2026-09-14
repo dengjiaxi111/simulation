@@ -34,6 +34,7 @@
   <exec_depend>seu_sentry_sim_control</exec_depend>
   <exec_depend>xmacro</exec_depend>
   <exec_depend>rmoss_gz_resources</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

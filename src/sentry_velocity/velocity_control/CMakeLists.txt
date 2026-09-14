@@ -98,6 +98,31 @@ install(TARGETS wheel_sim_adapter_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(cmd_vel_mux_node src/cmd_vel_mux.cpp)
+ament_target_dependencies(cmd_vel_mux_node
+  geometry_msgs rclcpp std_msgs
+)
+
+install(TARGETS cmd_vel_mux_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(keyboard_sim_adapter_node src/keyboard_sim_adapter.cpp)
+ament_target_dependencies(keyboard_sim_adapter_node
+  geometry_msgs rclcpp sensor_msgs std_msgs
+)
+
+install(TARGETS keyboard_sim_adapter_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(control_mode_once_node src/control_mode_once.cpp)
+ament_target_dependencies(control_mode_once_node rclcpp std_msgs)
+
+install(TARGETS control_mode_once_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
 add_executable(keyboard_teleop_node src/keyboard_teleop.cpp)
 ament_target_dependencies(keyboard_teleop_node geometry_msgs rclcpp std_msgs)
 

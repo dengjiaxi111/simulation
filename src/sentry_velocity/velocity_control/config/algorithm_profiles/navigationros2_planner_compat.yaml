@@ -1,0 +1,8 @@
+# Jazzy pluginlib class names use C++ namespaces.  This file is loaded after
+# navigationros2's planner.yaml so the algorithm repository remains unchanged.
+planner_server:
+  ros__parameters:
+    GridBased:
+      plugin: "nav2_smac_planner::SmacPlannerHybrid"
+    Smac:
+      plugin: "nav2_smac_planner::SmacPlanner2D"

@@ -1,0 +1,45 @@
+# Simulation-side compatibility overrides for navigationros2.
+#
+# The upstream configuration uses spatio_temporal_voxel_layer, which is not a
+# dependency of this simulator installation.  Keep the algorithm's frames and
+# tuning, but consume the segmented PointCloud2 with Nav2's standard obstacle
+# layer instead.  This file is loaded after mybringup/config/costmap2d.yaml.
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: pointcloud
+        pointcloud:
+          topic: /cloud_filtered
+          data_type: "PointCloud2"
+          marking: true
+          clearing: true
+          min_obstacle_height: -1.0
+          max_obstacle_height: 2.0
+          obstacle_max_range: 30.0
+          obstacle_min_range: 0.0
+          raytrace_max_range: 30.0
+          raytrace_min_range: 0.0
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: true
+        observation_sources: pointcloud
+        pointcloud:
+          topic: /cloud_filtered
+          data_type: "PointCloud2"
+          marking: true
+          clearing: true
+          min_obstacle_height: -1.0
+          max_obstacle_height: 1.0
+          obstacle_max_range: 5.0
+          obstacle_min_range: 0.0
+          raytrace_max_range: 5.0
+          raytrace_min_range: 0.0

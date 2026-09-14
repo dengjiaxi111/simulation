@@ -110,8 +110,8 @@ private:
     double next_gimbal = 0.0;
     bool recognized = true;
     switch (key) {
-      case 'w': next_command.linear.x = linear_speed_; break;
-      case 's': next_command.linear.x = -linear_speed_; break;
+      case 's': next_command.linear.x = linear_speed_; break;
+      case 'w': next_command.linear.x = -linear_speed_; break;
       case 'a': next_command.linear.y = linear_speed_; break;
       case 'd': next_command.linear.y = -linear_speed_; break;
       case 'j': next_command.angular.z = chassis_yaw_speed_; break;

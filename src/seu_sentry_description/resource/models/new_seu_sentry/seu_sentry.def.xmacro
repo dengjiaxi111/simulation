@@ -3,7 +3,7 @@
   <xmacro_define_block name="new_seu_sentry">
     <link name="chassis">
       <!-- Box approximation (0.43 x 0.42 x 0.18 m), shifted from its collision center to the CAD COM. -->
-      <inertial><pose>-0.0036599 0.0024775 -0.12222 0 0 0</pose><mass>5.38</mass><inertia><ixx>0.0952403</ixx><ixy>0.0000488</ixy><ixz>-0.0003391</ixz><iyy>0.0990902</iyy><iyz>0.0002295</iyz><izz>0.162088</izz></inertia></inertial>
+      <inertial><pose>-0.0036599 0.0024775 -0.12222 0 0 0</pose><mass>12.0</mass><inertia><ixx>0.212431896</ixx><ixy>0.000108847</ixy><ixz>-0.000756356</ixz><iyy>0.221019034</iyy><iyz>0.000511896</iyz><izz>0.361534572</izz></inertia></inertial>
       <visual name="chassis_visual"><geometry><mesh><uri>model://new_seu_sentry/meshes/chejia_link.STL</uri></mesh></geometry></visual>
       <collision name="chassis_main_collision"><pose>0 0 -0.105 0 0 0</pose><geometry><box><size>0.43 0.42 0.18</size></box></geometry></collision>
       <collision name="chassis_upper_collision"><pose>0 0 -0.005 0 0 0</pose><geometry><box><size>0.30 0.30 0.04</size></box></geometry></collision>
@@ -13,8 +13,14 @@
     <joint name="gimbal_yaw_joint" type="revolute"><pose relative_to="chassis">0 0 0.0165 0 0 1.6032</pose><parent>chassis</parent><child>base_link</child><axis><xyz>0 0 1</xyz><limit><lower>-1.79769e+308</lower><upper>1.79769e+308</upper><effort>100</effort><velocity>20</velocity></limit></axis></joint>
     <link name="base_link">
       <pose relative_to="gimbal_yaw_joint">0 0 0 0 0 0</pose>
-      <!-- The source URDF had iyy/izz=5670, inconsistent with a 3.04 kg assembly; replaced by positive SI values. -->
-      <inertial><pose>-0.037 0.035 0.125 0 0 0</pose><mass>3.04</mass><inertia><ixx>0.0221569</ixx><ixy>-0.0021888</ixy><ixz>0.0020672</ixz><iyy>0.0479292</iyy><iyz>0.0009302</iyz><izz>0.0460463</izz></inertia></inertial>
+      <!--
+        Simulation-only yaw decoupling: retain the 0.8 kg gimbal mass and its
+        on-axis COM, but make the inertia about the yaw axis negligible.  Equal
+        roll / pitch moments keep the inertia tensor positive and well formed.
+        The gimbal joint and its position feedback remain unchanged, so the
+        existing gimbal-to-chassis velocity transform still uses the same angle.
+      -->
+      <inertial><pose>0 0 0.125 0 0 0</pose><mass>0.8</mass><inertia><ixx>0.008700000</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.008700000</iyy><iyz>0</iyz><izz>0.000001000</izz></inertia></inertial>
       <visual name="base_link_visual"><geometry><mesh><uri>model://new_seu_sentry/meshes/yuntai_Link.STL</uri></mesh></geometry></visual>
       <collision name="base_link_collision"><pose>0.003 0.0535 0.108 0 0 0</pose><geometry><box><size>0.35 0.19 0.21</size></box></geometry></collision>
     </link>
