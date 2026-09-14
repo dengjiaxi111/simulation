@@ -234,6 +234,25 @@ def _reroot_wheel_urdf(robot_xml):
                 (child is not None and child.get("link") in remove_links)):
             root.remove(joint)
 
+    # Keep the PB2025 ground-reference convention in the ROS description.
+    # The source SDF defines chassis -> base_footprint at z=-0.28585 m.  The
+    # SDF-to-URDF conversion can omit this empty link, so add it explicitly;
+    # it is a TF-only frame and has no inertial/collision properties.
+    if root.find("./link[@name='base_footprint']") is None:
+        ET.SubElement(root, "link", name="base_footprint")
+    if root.find("./joint[@name='chassis_to_base_footprint']") is None:
+        footprint_joint = ET.SubElement(
+            root, "joint", name="chassis_to_base_footprint", type="fixed"
+        )
+        ET.SubElement(
+            footprint_joint,
+            "origin",
+            xyz="0 0 -0.28585",
+            rpy="0 0 0",
+        )
+        ET.SubElement(footprint_joint, "parent", link="chassis")
+        ET.SubElement(footprint_joint, "child", link="base_footprint")
+
     # The algorithm publishes odom -> base_link.  Keep base_link as the sole
     # parent of the visual chassis branch, rather than publishing a second
     # chassis -> base_link parent in the simulator.
