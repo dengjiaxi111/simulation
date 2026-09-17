@@ -1,5 +1,7 @@
 required_packages:
   - small_point_lio
+  - localization_initializer
+  - sentry_decision
   - fake_vel_transform
   - pointcloud_segmentation
   - mybringup
@@ -11,21 +13,44 @@ required_packages:
   - nav2_lifecycle_manager
   - rviz2
 
+navigation_tf_gate:
+  target_frame: odom
+  source_frame: base_link_fake
+
 actions:
   # LIO owns odom -> base_link and consumes the simulated Livox topics.
   - type: node
-    package: velocity_control
-    executable: lio_after_tf.py
+    package: small_point_lio
+    executable: small_point_lio_node
     name: small_point_lio
     delay: 1.5
+    remappings:
+      - [/tf, /lio/raw_tf]
+      - [/Odometry, /lio/raw_odometry]
+      - [/cloud_registered, /lio/raw_cloud_registered]
     parameters:
-      - lio_params_file: package://small_point_lio/config/mid360_sim.yaml
+      - package://small_point_lio/config/mid360_sim.yaml
       - lidar_frame: livox_frame
-        base_frame: base_link
         # save_pcd remains owned by mid360_sim.yaml and the algorithm.
+    wait_for_sensors:
+      base_frame: base_link
+      lidar_frame: livox_frame
+      imu_topic: /livox/imu
+      require_static_imu: true
+      sample_count: 200
+      stable_duration: 0.9
+      acceleration_norm: 9.81
+      acceleration_tolerance: 1.0
+      max_angular_speed: 0.1
+      max_acceleration_stddev: 0.15
 
-  # Keep map available before localization with an identity map->odom.  The
-  # first RViz /initialpose updates that transform and then enables navigation.
+  - type: node
+    package: velocity_control
+    executable: lio_ground_adapter.py
+    name: lio_ground_adapter
+
+  # Convert the ground-level RViz pose to physical base_link for NDT.
+  # This adapter never publishes map->odom in NDT mode.
   - type: node
     package: velocity_control
     executable: navigation_initialpose_gate.py
@@ -33,21 +58,48 @@ actions:
     parameters:
       - map_frame: map
         odom_frame: odom
-        base_frame: base_footprint
+        base_frame: base_links
         initialpose_topic: /initialpose
+        localization_mode: ndt
+
+  - type: node
+    package: localization_initializer
+    executable: localization_initializer_node
+    name: localization_initializer
+    parameters:
+      - package://localization_initializer/config/initializer_params.yaml
+      # Same coordinates as scan.pcd; sparse 0.08 m voxel representatives.
+      # Original algorithm map and source files are never overwritten.
+      - map_file: /home/dengjiaxi/simulation_seu/navigationsim/maps/scan_voxel_008.pcd
+        auto_initialize: false
+        use_initialpose_as_static_tf: false
+    remappings:
+      - [/initialpose, /localization/initialpose_base_link]
+
+  - type: node
+    package: sentry_decision
+    executable: sentry_decision_node
+    name: sentry_decision
+    delay: 4.0
 
   - type: include
     launch: package://pointcloud_segmentation/launch/segmentation.launch.py
 
-  # This is the algorithm's own virtual-frame conversion. Its output is already
-  # a chassis command, despite the legacy /cmd_vel_gimbal topic name.
+  # The algorithm converts the virtual heading to the physical gimbal frame.
   - type: include
     launch: package://fake_vel_transform/launch/fake_vel_transform.launch.py
     launch_arguments:
       use_sim_time: true
       use_fake_vel: true
     remappings:
-      - [/cmd_vel_gimbal, /navigation/cmd_vel]
+      - [/cmd_vel_gimbal, /navigation/cmd_vel_base_link]
+
+  # Simulation adapter converts the gimbal velocity to chassis coordinates
+  # before the existing mux selects it alongside chassis-frame keyboard input.
+  - type: node
+    package: velocity_control
+    executable: navigation_to_chassis.py
+    name: navigation_to_chassis
 
   - type: lifecycle_node
     package: nav2_map_server

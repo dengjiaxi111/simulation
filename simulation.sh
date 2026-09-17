@@ -10,7 +10,9 @@ ROS_SETUP="/opt/ros/jazzy/setup.bash"
 SIM_SETUP="${SIM_WS}/install/setup.bash"
 NAVROS2_SETUP="${NAVROS2_WS}/install/setup.bash"
 MODEL_MODE="${MODEL_MODE:-wheel}"
-SPAWN_Z="${SPAWN_Z:-0.67}"
+# Spawn ground surface at (4.5, 11): z=0.358656; chassis/contact offset
+# 0.28585 m. Leave approximately 5.5 mm for normal physical settling.
+SPAWN_Z="${SPAWN_Z:-0.65}"
 
 log() { printf '[simulation] %s\n' "$*"; }
 die() { printf '[simulation] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -34,7 +36,8 @@ cleanup_previous_run() {
     '[w]heel_sim_adapter_node' '[k]eyboard_sim_adapter_node' '[k]eyboard_teleop_node' \
     '[c]md_vel_mux_node' '[c]ontrol_mode_once_node' '[p]p2_to_livox_node' \
     '[n]avigation_initialpose_gate.py' '[i]mu_alias_node' '[c]lock_bridge' \
-    '[s]tartup_pose_release.py'
+    '[s]tartup_pose_release.py' '[n]avigation_to_chassis.py' '[w]ait_for_sensors.py' \
+    '[w]ait_for_tf.py' '[r]viz_after_map.py' '[l]io_ground_adapter.py'
 
   # Both supported algorithm launch styles; only processes are stopped.
   stop_matching TERM \
@@ -44,6 +47,7 @@ cleanup_previous_run() {
     '[n]av2_' '[c]ontroller_server' '[p]lanner_server' '[b]t_navigator' \
     '[b]ehavior_server' '[m]ap_server' '[l]ifecycle_manager' '[c]ostmap' \
     '[p]ointcloud_obstacle_layer' '[l]ocal_obstacle_grid_node' '[f]ake_vel_transform' \
+    '[/]pointcloud_segmentation/lib/pointcloud_segmentation/segmentation' \
     '[s]entry_decision_node' '[r]viz2'
 
   sleep 1
@@ -54,13 +58,15 @@ cleanup_previous_run() {
     '[w]heel_sim_adapter_node' '[k]eyboard_sim_adapter_node' '[k]eyboard_teleop_node' \
     '[c]md_vel_mux_node' '[c]ontrol_mode_once_node' '[p]p2_to_livox_node' \
     '[n]avigation_initialpose_gate.py' '[i]mu_alias_node' '[c]lock_bridge' \
-    '[s]tartup_pose_release.py' \
+    '[s]tartup_pose_release.py' '[n]avigation_to_chassis.py' '[w]ait_for_sensors.py' \
+    '[w]ait_for_tf.py' '[r]viz_after_map.py' '[l]io_ground_adapter.py' \
     '[r]os2 launch velocity_control algorithm_sim.launch.py' \
     '[r]os2 launch nav_bringup navigation_s.launch.py' '[s]mall_point_lio_node' \
     '[s]mall_point_lio' '[l]io_after_tf.py' '[l]ocalization_initializer_node' '[n]av_server' '[n]av2_' \
     '[c]ontroller_server' '[p]lanner_server' '[b]t_navigator' '[b]ehavior_server' \
     '[m]ap_server' '[l]ifecycle_manager' '[c]ostmap' '[p]ointcloud_obstacle_layer' \
-    '[l]ocal_obstacle_grid_node' '[f]ake_vel_transform' '[s]entry_decision_node' '[r]viz2'
+    '[l]ocal_obstacle_grid_node' '[f]ake_vel_transform' '[s]entry_decision_node' '[r]viz2' \
+    '[/]pointcloud_segmentation/lib/pointcloud_segmentation/segmentation'
 }
 
 check_environment() {

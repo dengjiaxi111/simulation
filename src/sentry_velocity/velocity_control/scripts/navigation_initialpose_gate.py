@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-"""Own map->odom during simulation and enable navigation after /initialpose."""
+"""Adapt ground initial poses; in NDT mode only localization owns map->odom."""
 
 import math
+import copy
 
 import rclpy
 from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
@@ -74,6 +75,10 @@ class NavigationInitialPoseGate(Node):
         self.declare_parameter("initialpose_topic", "/initialpose")
         self.declare_parameter("mode_topic", "/control_mode")
         self.declare_parameter("tf_publish_rate", 20.0)
+        self.declare_parameter("localization_mode", "manual")
+        self.localization_mode = self.get_parameter("localization_mode").value
+        if self.localization_mode not in ("manual", "ndt"):
+            raise ValueError("localization_mode must be manual or ndt")
 
         self.map_frame = self.get_parameter("map_frame").value
         self.odom_frame = self.get_parameter("odom_frame").value
@@ -93,13 +98,32 @@ class NavigationInitialPoseGate(Node):
         self.map_to_odom = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0))
         self.initialpose_received = False
         self.navigation_mode_messages = 0
+        self.ground_aligned = False
+        self.pending_initialpose = None
+        self.localization_ready = False
+        if self.localization_mode == "ndt":
+            self.ndt_pose_publisher = self.create_publisher(
+                PoseWithCovarianceStamped, "/localization/initialpose_base_link", 10
+            )
+            self.status_subscription = self.create_subscription(
+                String, "/localization/status", self.on_localization_status, 10
+            )
         self.timer = self.create_timer(1.0 / publish_rate, self.on_timer)
         self.get_logger().info(
-            f"Publishing provisional {self.map_frame}->{self.odom_frame}=identity; "
+            f"Localization mode: {self.localization_mode}; "
             f"waiting for {initialpose_topic} before enabling navigation"
         )
 
     def on_initialpose(self, message):
+        self.pending_initialpose = message
+        if message.header.frame_id != self.map_frame:
+            self.get_logger().warning("Initial pose must be expressed in the map frame")
+            self.pending_initialpose = None
+            return
+        if self.localization_mode == "ndt":
+            self.localization_ready = False
+            self.navigation_mode_messages = 0
+            self.publish_mode("keyboard")
         pose = message.pose.pose
         map_to_base = (
             (
@@ -109,6 +133,44 @@ class NavigationInitialPoseGate(Node):
             ),
             (pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w),
         )
+
+        if self.localization_mode == "ndt":
+            if self.ndt_pose_publisher.get_subscription_count() == 0:
+                return
+            try:
+                ground_to_base = self.tf_buffer.lookup_transform(
+                    self.base_frame, "base_link", rclpy.time.Time()
+                ).transform
+                # Also wait for LIO's dynamic pose, which NDT needs to derive
+                # its map->odom guess from the physical base_link pose.
+                self.tf_buffer.lookup_transform(
+                    self.odom_frame, "base_link", rclpy.time.Time()
+                )
+            except TransformException as exception:
+                self.get_logger().warning(
+                    f"Waiting for initial-pose TF: {exception}",
+                    throttle_duration_sec=2.0,
+                )
+                return
+            physical_pose = transform_multiply(map_to_base, (
+                (ground_to_base.translation.x, ground_to_base.translation.y,
+                 ground_to_base.translation.z),
+                (ground_to_base.rotation.x, ground_to_base.rotation.y,
+                 ground_to_base.rotation.z, ground_to_base.rotation.w),
+            ))
+            output = copy.deepcopy(message)
+            output.header.stamp = self.get_clock().now().to_msg()
+            p, q = output.pose.pose.position, output.pose.pose.orientation
+            p.x, p.y, p.z = physical_pose[0]
+            q.x, q.y, q.z, q.w = physical_pose[1]
+            self.localization_ready = False
+            self.navigation_mode_messages = 0
+            self.publish_mode("keyboard")
+            self.ndt_pose_publisher.publish(output)
+            self.pending_initialpose = None
+            self.initialpose_received = True
+            self.get_logger().info("Ground initial pose converted to base_link; waiting for NDT")
+            return
 
         try:
             odom_to_base_message = self.tf_buffer.lookup_transform(
@@ -125,16 +187,31 @@ class NavigationInitialPoseGate(Node):
         except TransformException as exception:
             self.get_logger().warning(
                 f"Cannot look up {self.odom_frame}->{self.base_frame}; "
-                f"using /initialpose directly as {self.map_frame}->{self.odom_frame}: {exception}"
+                f"waiting to apply /initialpose: {exception}",
+                throttle_duration_sec=2.0,
             )
-            self.map_to_odom = map_to_base
+            return
 
         # Repeat briefly so every simulation-side subscriber observes the switch.
         self.initialpose_received = True
+        self.ground_aligned = True
+        self.pending_initialpose = None
         self.navigation_mode_messages = 20
         self.get_logger().info(
             "Initial pose received: updated map->odom and enabling navigation mode"
         )
+
+    def on_localization_status(self, message):
+        if not self.initialpose_received or self.pending_initialpose is not None:
+            return
+        if "定位成功" in message.data and not self.localization_ready:
+            self.localization_ready = True
+            self.navigation_mode_messages = 20
+            self.get_logger().info("NDT succeeded; enabling navigation")
+        elif "配准失败" in message.data or "回退模式" in message.data:
+            self.localization_ready = False
+            self.navigation_mode_messages = 0
+            self.publish_mode("keyboard")
 
     def publish_mode(self, mode):
         message = String()
@@ -142,6 +219,28 @@ class NavigationInitialPoseGate(Node):
         self.mode_publisher.publish(message)
 
     def on_timer(self):
+        if self.pending_initialpose is not None:
+            self.on_initialpose(self.pending_initialpose)
+        if self.localization_mode == "ndt":
+            # NDT is the sole map->odom owner. No provisional competing TF.
+            if not self.localization_ready:
+                self.publish_mode("keyboard")
+            if self.navigation_mode_messages > 0:
+                self.publish_mode("navigation")
+                self.navigation_mode_messages -= 1
+            return
+        if not self.ground_aligned:
+            try:
+                ground = self.tf_buffer.lookup_transform(
+                    self.odom_frame, self.base_frame, rclpy.time.Time()
+                ).transform.translation
+                self.map_to_odom = (
+                    (0.0, 0.0, -ground.z), (0.0, 0.0, 0.0, 1.0)
+                )
+                self.ground_aligned = True
+                self.get_logger().info("LIO TF ready; aligned ground reference to map z=0")
+            except TransformException:
+                pass
         translation, rotation = self.map_to_odom
         transform = TransformStamped()
         transform.header.stamp = self.get_clock().now().to_msg()

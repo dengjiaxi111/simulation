@@ -1,73 +1,120 @@
 #include <atomic>
+#include <chrono>
+#include <cmath>
+#include <stdexcept>
 #include <string>
 
 #include <gz/plugin/Register.hh>
 #include <gz/msgs/boolean.pb.h>
-#include <gz/sim/Link.hh>
+#include <gz/msgs/twist.pb.h>
 #include <gz/sim/Model.hh>
+#include <gz/sim/SdfEntityCreator.hh>
 #include <gz/sim/System.hh>
-#include <gz/sim/Util.hh>
-#include <gz/sim/components/JointVelocityReset.hh>
+#include <gz/sim/components/DetachableJoint.hh>
+#include <gz/sim/components/World.hh>
 #include <gz/transport/Node.hh>
 #include <sdf/Element.hh>
+#include <sdf/Link.hh>
+#include <sdf/Model.hh>
+#include "startup_motion_gate.hpp"
 
 namespace seu_sentry_sim_control
 {
+// Hold only the chassis with a physical fixed constraint. Gimbal and steering
+// controllers remain independent; no teleporting or joint velocity resets.
 class StartupPoseLock final : public gz::sim::System,
   public gz::sim::ISystemConfigure,
   public gz::sim::ISystemPreUpdate
 {
 public:
   void Configure(const gz::sim::Entity & entity, const std::shared_ptr<const sdf::Element> & sdf,
-    gz::sim::EntityComponentManager &, gz::sim::EventManager &) override
+    gz::sim::EntityComponentManager & ecm, gz::sim::EventManager & events) override
   {
-    model_ = gz::sim::Model(entity);
-    if (sdf && sdf->HasElement("release_topic")) {
-      release_topic_ = sdf->Get<std::string>("release_topic");
+    const gz::sim::Model robot(entity);
+    const auto chassis = robot.LinkByName(ecm, "chassis");
+    // Model plugins are configured before SdfEntityCreator assigns the model
+    // its ParentEntity. The world itself already exists at this stage.
+    const auto world = ecm.EntityByComponents(gz::sim::components::World());
+    if (chassis == gz::sim::kNullEntity || world == gz::sim::kNullEntity) {
+      throw std::runtime_error("Startup lock requires a chassis link and world parent");
     }
-    transport_.Subscribe(release_topic_, &StartupPoseLock::OnRelease, this);
+    if (sdf && sdf->HasElement("command_topic")) {
+      command_topic_ = sdf->Get<std::string>("command_topic");
+    }
+    if (sdf && sdf->HasElement("command_deadband")) {
+      command_deadband_ = sdf->Get<double>("command_deadband");
+    }
+    if (!std::isfinite(command_deadband_) || command_deadband_ < 0.0) {
+      throw std::runtime_error("Invalid startup command deadband");
+    }
+
+    // An invisible static anchor is a genuine world-fixed physics link. A
+    // detachable joint preserves the chassis pose when attached to this link.
+    sdf::Model anchor;
+    anchor.SetName("sentry_startup_anchor_" + std::to_string(entity));
+    anchor.SetStatic(true);
+    sdf::Link anchor_link;
+    anchor_link.SetName("anchor");
+    anchor.AddLink(anchor_link);
+    gz::sim::SdfEntityCreator creator(ecm, events);
+    anchor_entity_ = creator.CreateEntities(&anchor);
+    creator.SetParent(anchor_entity_, world);
+    const auto anchor_link_entity = gz::sim::Model(anchor_entity_).LinkByName(ecm, "anchor");
+    joint_entity_ = ecm.CreateEntity();
+    ecm.CreateComponent(joint_entity_, gz::sim::components::DetachableJoint(
+      {anchor_link_entity, chassis, "fixed"}));
+
+    transport_.Subscribe(command_topic_, &StartupPoseLock::OnCommand, this);
+    status_publisher_ = transport_.Advertise<gz::msgs::Boolean>(
+      "/simulation/robot_released");
   }
 
-  void PreUpdate(const gz::sim::UpdateInfo &, gz::sim::EntityComponentManager & ecm) override
+  void PreUpdate(const gz::sim::UpdateInfo & info, gz::sim::EntityComponentManager & ecm) override
   {
-    if (!model_.Valid(ecm)) return;
-    if (!pose_initialized_) {
-      initial_pose_ = gz::sim::worldPose(model_.Entity(), ecm);
-      pose_initialized_ = true;
-    }
-    if (released_.load()) {
-      if (!release_applied_) {
-        for (const auto joint : model_.Joints(ecm)) {
-          ecm.SetComponentData<gz::sim::components::JointVelocityReset>(joint, {0.0});
-        }
-        release_applied_ = true;
+    if (release_requested_.load() && !released_) {
+      if (!removal_requested_) {
+        ecm.RequestRemoveEntity(joint_entity_);
+        removal_requested_ = true;
+      } else if (!ecm.HasEntity(joint_entity_)) {
+        released_ = true;
+        ecm.RequestRemoveEntity(anchor_entity_, true);
       }
-      return;
     }
-    model_.SetWorldPoseCmd(ecm, initial_pose_);
-    for (const auto link_entity : model_.Links(ecm)) {
-      gz::sim::Link link(link_entity);
-      link.SetLinearVelocity(ecm, gz::math::Vector3d::Zero);
-      link.SetAngularVelocity(ecm, gz::math::Vector3d::Zero);
-    }
-    for (const auto joint : model_.Joints(ecm)) {
-      ecm.SetComponentData<gz::sim::components::JointVelocityReset>(joint, {0.0});
+    const double now = std::chrono::duration<double>(info.simTime).count();
+    if (!status_sent_ || released_ != last_status_ || now < last_status_time_ ||
+        now - last_status_time_ >= 0.25) {
+      gz::msgs::Boolean status;
+      status.set_data(released_);
+      status_publisher_.Publish(status);
+      last_status_ = released_;
+      last_status_time_ = now;
+      status_sent_ = true;
     }
   }
 
 private:
-  void OnRelease(const gz::msgs::Boolean & message)
+  void OnCommand(const gz::msgs::Twist & command)
   {
-    if (message.data()) released_.store(true);
+    const double vx = command.linear().x();
+    const double vy = command.linear().y();
+    const double wz = command.angular().z();
+    if (is_startup_motion_command(vx, vy, wz, command_deadband_)) {
+      release_requested_.store(true);
+    }
   }
 
-  gz::sim::Model model_;
   gz::transport::Node transport_;
-  gz::math::Pose3d initial_pose_;
-  std::string release_topic_{"/simulation/robot_release"};
-  std::atomic_bool released_{false};
-  bool pose_initialized_{false};
-  bool release_applied_{false};
+  gz::transport::Node::Publisher status_publisher_;
+  gz::sim::Entity anchor_entity_{gz::sim::kNullEntity};
+  gz::sim::Entity joint_entity_{gz::sim::kNullEntity};
+  std::string command_topic_{"/simulation/startup_cmd_vel"};
+  double command_deadband_{0.0001};
+  std::atomic_bool release_requested_{false};
+  bool removal_requested_{false};
+  bool released_{false};
+  bool status_sent_{false};
+  bool last_status_{false};
+  double last_status_time_{0.0};
 };
 }  // namespace seu_sentry_sim_control
 

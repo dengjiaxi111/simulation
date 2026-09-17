@@ -16,16 +16,32 @@ class StartupPoseRelease(Node):
             PoseWithCovarianceStamped, "/initialpose", self.release, 10
         )
         self.released = False
+        self.release_requested = False
+        self.status_subscription = self.create_subscription(
+            Bool, "/simulation/robot_released", self.on_status, 10
+        )
+        self.retry_timer = self.create_timer(0.25, self.send_request)
 
     def release(self, _message):
-        if self.released:
+        if self.released or self.release_requested:
+            return
+        self.release_requested = True
+        self.get_logger().info("/initialpose received; requesting Gazebo unlock")
+        self.send_request()
+
+    def send_request(self):
+        if not self.release_requested or self.released:
             return
         message = Bool()
         message.data = True
-        for _ in range(10):
-            self.publisher.publish(message)
-        self.released = True
-        self.get_logger().info("/initialpose received; releasing Gazebo startup pose lock")
+        self.publisher.publish(message)
+
+    def on_status(self, message):
+        if message.data and not self.released:
+            self.released = True
+            self.get_logger().info("Gazebo confirmed startup pose lock released")
+        elif not message.data and self.released:
+            self.released = False
 
 
 def main(args=None):

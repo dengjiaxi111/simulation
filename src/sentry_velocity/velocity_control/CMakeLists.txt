@@ -124,6 +124,9 @@ install(TARGETS control_mode_once_node
 )
 
 install(PROGRAMS
+  scripts/lio_ground_adapter.py
+  scripts/wait_for_sensors.py
+  scripts/navigation_to_chassis.py
   scripts/navigation_initialpose_gate.py
   scripts/rviz_after_map.py
   scripts/startup_pose_release.py

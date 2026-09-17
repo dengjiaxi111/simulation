@@ -29,7 +29,7 @@ WHEEL_RESOURCE_DEFAULT = (
     "/home/dengjiaxi/simulation_seu/navigationsim/src/"
     "seu_sentry_description/resource/models"
 )
-WHEEL_SPAWN_Z_DEFAULT = "0.670"
+WHEEL_SPAWN_Z_DEFAULT = "0.650"
 
 # Force Gazebo's GUI / OGRE renderer onto the discrete NVIDIA GLX provider on
 # hybrid-GPU systems.  QT_XCB_GL_INTEGRATION avoids Qt selecting an AMD EGL
@@ -136,6 +136,7 @@ def _patch_wheel_sdf(robot_xml):
 
     for plugin in model.findall("plugin"):
         if plugin.get("filename") == "libstartup_pose_lock.so":
+            model.remove(plugin)
             continue
         if plugin.get("filename") == "gz-sim-joint-controller-system":
             joint_name = plugin.find("joint_name")
@@ -174,8 +175,8 @@ def _patch_wheel_sdf(robot_xml):
         "filename": "libstartup_pose_lock.so",
         "name": "seu_sentry_sim_control::StartupPoseLock",
     })
-    ET.SubElement(startup_lock, "release_topic").text = "/simulation/robot_release"
-
+    ET.SubElement(startup_lock, "command_topic").text = "/simulation/startup_cmd_vel"
+    ET.SubElement(startup_lock, "command_deadband").text = "0.0001"
     return ET.tostring(root, encoding="unicode")
 
 
@@ -252,6 +253,19 @@ def _reroot_wheel_urdf(robot_xml):
         )
         ET.SubElement(footprint_joint, "parent", link="chassis")
         ET.SubElement(footprint_joint, "child", link="base_footprint")
+
+    # Planar reference at the wheel contact plane, with the gimbal's heading.
+    # Keep the physical base_link and sensor extrinsics at their real heights.
+    if root.find("./link[@name='base_links']") is None:
+        ET.SubElement(root, "link", name="base_links")
+    if root.find("./joint[@name='base_link_to_base_links']") is None:
+        ground_joint = ET.SubElement(
+            root, "joint", name="base_link_to_base_links", type="fixed"
+        )
+        ET.SubElement(ground_joint, "origin",
+                      xyz="0 0 %.9g" % (-0.28585 - t[2]), rpy="0 0 0")
+        ET.SubElement(ground_joint, "parent", link="base_link")
+        ET.SubElement(ground_joint, "child", link="base_links")
 
     # The algorithm publishes odom -> base_link.  Keep base_link as the sole
     # parent of the visual chassis branch, rather than publishing a second
@@ -480,26 +494,9 @@ def launch_setup(context):
         )
         if robot_state_publisher is not None:
             actions.append(robot_state_publisher)
-        startup_pose_release = Node(
-            package="velocity_control",
-            executable="startup_pose_release.py",
-            name="startup_pose_release",
-            output="screen",
-            parameters=[{"use_sim_time": True}],
-        )
-        startup_pose_release_bridge = Node(
-            package="ros_gz_bridge",
-            executable="parameter_bridge",
-            name="startup_pose_release_bridge",
-            arguments=["/simulation/robot_release@std_msgs/msg/Bool@gz.msgs.Boolean"],
-            output="screen",
-            parameters=[{"use_sim_time": True}],
-        )
         actions += [
             TimerAction(period=3.0, actions=[spawn_robot]),
             bridge_cmd_vel,
-            startup_pose_release_bridge,
-            startup_pose_release,
             swerve_sim_controller,
         ]
         if enable_motion_adapter.lower() == "true":

@@ -9,6 +9,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     GroupAction,
     IncludeLaunchDescription,
+    LogInfo,
     OpaqueFunction,
     RegisterEventHandler,
     SetEnvironmentVariable,
@@ -82,6 +83,18 @@ def _make_action(spec):
                 raise RuntimeError(
                     f"navigationros2 map file does not exist: {map_files[0]}"
                 )
+        if spec.get("package") == "localization_initializer":
+            map_files = [
+                parameter["map_file"] for parameter in parameters
+                if isinstance(parameter, dict) and "map_file" in parameter
+            ]
+            if not map_files or not os.path.isfile(map_files[-1]):
+                raise RuntimeError(
+                    "NDT localization PCD does not exist: "
+                    f"{map_files[-1] if map_files else '(map_file not configured)'}. "
+                    "Set the profile map_file to the transformed localization map; "
+                    "refusing the algorithm's fallback without a PCD map."
+                )
         # Simulation time is enforced for every algorithm-side node.
         parameters.append({"use_sim_time": True})
         kwargs = {
@@ -104,6 +117,29 @@ def _make_action(spec):
         action = node_class(**kwargs)
     else:
         raise RuntimeError(f"Unsupported profile action type: {action_type}")
+
+    # Profiles may gate any node/include without a launcher that knows the
+    # algorithm package, executable, or initialization implementation.
+    if "wait_for_sensors" in spec:
+        gate = Node(
+            package="velocity_control",
+            executable="wait_for_sensors.py",
+            name=f"{spec.get('name', 'algorithm')}_sensor_gate",
+            output="screen",
+            parameters=[_resolve(spec["wait_for_sensors"]), {"use_sim_time": True}],
+        )
+
+        gated_action = action
+
+        def after_sensor_gate(event, context):
+            if event.returncode == 0:
+                return [gated_action]
+            return [LogInfo(msg="Sensor gate did not succeed; algorithm action was not started")]
+
+        action = GroupAction([
+            RegisterEventHandler(OnProcessExit(target_action=gate, on_exit=after_sensor_gate)),
+            gate,
+        ])
 
     delay = float(spec.get("delay", 0.0))
     return TimerAction(period=delay, actions=[action]) if delay > 0.0 else action
@@ -140,6 +176,7 @@ def _launch_setup(context):
         if (
             spec.get("type") == "node"
             and spec.get("name") == "navigation_lifecycle_manager"
+            and "navigation_tf_gate" in profile
         ):
             navigation_manager_action = _make_action(spec)
             navigation_tf_gate = Node(
@@ -149,8 +186,8 @@ def _launch_setup(context):
                 output="screen",
                 parameters=[
                     {
-                        "target_frame": "odom",
-                        "source_frame": "base_link_fake",
+                        "target_frame": profile["navigation_tf_gate"].get("target_frame", "odom"),
+                        "source_frame": profile["navigation_tf_gate"].get("source_frame", "base_link_fake"),
                         "use_sim_time": True,
                     }
                 ],

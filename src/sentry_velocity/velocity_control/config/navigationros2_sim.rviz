@@ -115,11 +115,35 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Class: rviz_default_plugins/Path
+      Enabled: true
+      Name: Global Plan
+      Alpha: 1
+      Color: 25; 255; 0
+      Line Style: Lines
+      Line Width: 0.03
+      Buffer Length: 1
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0.03
+      Pose Style: None
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /plan
+      Value: true
     - Class: rviz_default_plugins/TF
       Enabled: true
       Frame Timeout: 15
       Frames:
-        All Enabled: true
+        All Enabled: false
+        base_links:
+          Value: true
+        map:
+          Value: true
       Marker Scale: 0.5
       Name: TF
       Show Arrows: true

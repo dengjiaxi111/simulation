@@ -27,7 +27,7 @@ public:
       "gimbal_joint_name", "gimbal_yaw_joint");
     gimbal_mount_yaw_ = declare_parameter<double>("gimbal_mount_yaw", 1.6032);
     navigation_gimbal_speed_ =
-      declare_parameter<double>("navigation_gimbal_speed", 3.14);
+      declare_parameter<double>("navigation_gimbal_speed", 100.0 * kPi / 180.0);
     command_timeout_ = declare_parameter<double>("command_timeout", 0.25);
     raw_keyboard_topic_ = declare_parameter<std::string>(
       "raw_keyboard_topic", "/keyboard/cmd_vel_gimbal");
