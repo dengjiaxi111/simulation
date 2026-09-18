@@ -323,7 +323,7 @@ def launch_setup(context):
 
     models_path = os.path.join(gazeboworld_path, "models")
     worlds_path = os.path.join(gazeboworld_path, "worlds")
-    world_file = os.path.join(worlds_path, "rmuc_2026_world.sdf")
+    world_file = LaunchConfiguration("world_path").perform(context) or os.path.join(worlds_path, "rmuc_2026_world.sdf")
 
     model_mode = LaunchConfiguration("model_mode").perform(context)
     wheel_model_path = LaunchConfiguration("wheel_model_path").perform(context)
@@ -567,5 +567,7 @@ def generate_launch_description():
         "enable_motion_adapter", default_value="true", choices=["true", "false"],
         description="Start wheel/gimbal motion adapter immediately.",
     ))
+    ld.add_action(DeclareLaunchArgument("world_path", default_value="",
+        description="Optional Gazebo world path; empty uses the competition world."))
     ld.add_action(OpaqueFunction(function=launch_setup))
     return ld

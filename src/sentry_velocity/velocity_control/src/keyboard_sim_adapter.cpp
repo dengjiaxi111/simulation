@@ -6,6 +6,7 @@
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/string.hpp"
@@ -65,6 +66,14 @@ public:
     joint_state_sub_ = create_subscription<sensor_msgs::msg::JointState>(
       "/joint_states", rclcpp::SensorDataQoS(),
       std::bind(&KeyboardSimAdapter::on_joint_state, this, std::placeholders::_1));
+    body_odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
+      "/wheel/odometry", rclcpp::SensorDataQoS(),
+      [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        chassis_yaw_speed_ = msg->twist.twist.angular.z;
+        body_stamp_ = now();
+        have_body_ = true;
+      });
     timer_ = create_wall_timer(
       std::chrono::milliseconds(20),
       std::bind(&KeyboardSimAdapter::update, this));
@@ -117,7 +126,9 @@ private:
         }
       } else {
         // Physical gimbal motion is independent of cmd_vel arbitration.
-        gimbal_output = navigation_gimbal_speed_;
+        // Joint speed is relative to chassis; compensate measured body yaw rate.
+        gimbal_output = navigation_gimbal_speed_ -
+          (fresh(have_body_, body_stamp_) ? chassis_yaw_speed_ : 0.0);
       }
     }
     keyboard_output_pub_->publish(keyboard_output);
@@ -126,6 +137,10 @@ private:
     gimbal_output_pub_->publish(gimbal_message);
   }
 
+  rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr body_odom_sub_;
+  double chassis_yaw_speed_{0.0};
+  bool have_body_{false};
+  rclcpp::Time body_stamp_{0, 0, RCL_ROS_TIME};
   mutable std::mutex mutex_;
   std::string gimbal_joint_name_;
   std::string raw_keyboard_topic_;

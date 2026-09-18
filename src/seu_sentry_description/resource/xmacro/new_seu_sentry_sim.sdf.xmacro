@@ -61,8 +61,8 @@
     -->
     <!-- Physics-step motor loops use the official JointForceCmd torque interface. -->
     <plugin filename="libsentry_motor_controller.so" name="seu_sentry_sim_control::SentryMotorController">
-      <wheel_kp>0.1</wheel_kp><wheel_ki>0.2</wheel_ki><wheel_kd>0</wheel_kd>
-      <steer_kp>8</steer_kp><steer_ki>0.2</steer_ki><steer_kd>0.08</steer_kd>
+      <wheel_kp>0.16</wheel_kp><wheel_ki>0.16</wheel_ki><wheel_kd>0.000005</wheel_kd>
+      <steer_kp>12</steer_kp><steer_ki>0.15</steer_ki><steer_kd>0.12</steer_kd>
       <wheel_torque_limit>2</wheel_torque_limit><steer_torque_limit>5</steer_torque_limit>
       <integral_limit>1</integral_limit><command_timeout>0.2</command_timeout>
     </plugin>

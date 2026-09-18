@@ -6,6 +6,7 @@
 #include <string>
 #include <gz/plugin/Register.hh>
 #include <gz/msgs/double.pb.h>
+#include <gz/msgs/double_v.pb.h>
 #include <gz/sim/Model.hh>
 #include <gz/sim/System.hh>
 #include <gz/sim/components/JointPosition.hh>
@@ -41,6 +42,16 @@ public:
     param("steer_kp",steer_kp_); param("steer_ki",steer_ki_); param("steer_kd",steer_kd_);
     param("wheel_torque_limit",wheel_limit_); param("steer_torque_limit",steer_limit_);
     param("integral_limit",integral_limit_); param("command_timeout",timeout_);
+    // Bounded live tuning: wheel P/I/D, steer P/I/D; no change to kinematics.
+    transport_.Subscribe<gz::msgs::Double_V>("/simulation/motor_gains",
+      [this](const gz::msgs::Double_V & msg) {
+        if (msg.data_size()!=6) return;
+        for (const double value:msg.data()) if (!std::isfinite(value) || value<0 || value>100) return;
+        std::lock_guard<std::mutex> lock(mutex_);
+        wheel_kp_=msg.data(0); wheel_ki_=msg.data(1); wheel_kd_=msg.data(2);
+        steer_kp_=msg.data(3); steer_ki_=msg.data(4); steer_kd_=msg.data(5);
+        for (auto & motor:motors_) {motor.integral=0; motor.previous_error=0;}
+      });
     gz::sim::Model model(entity);
     const std::array<std::string,4> sides{"front_left","front_right","rear_left","rear_right"};
     for (size_t i=0;i<8;++i) {

@@ -6,7 +6,7 @@ swerve_sim_controller:
     command_timeout: 0.2
     command_deadband: 0.0001
     wheel_radius: 0.0535
-    max_wheel_angular_speed: 50.0
+    max_wheel_angular_speed: 70.0
 
     # Module centers in the SDF chassis frame (the source CAD frame).
     module_x: [-0.159, 0.159, -0.159, 0.159]

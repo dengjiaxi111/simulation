@@ -110,7 +110,7 @@ install(TARGETS cmd_vel_mux_node
 add_executable(keyboard_sim_adapter_node src/keyboard_sim_adapter.cpp)
 ament_target_dependencies(keyboard_sim_adapter_node
   geometry_msgs rclcpp sensor_msgs std_msgs
-)
+ nav_msgs)
 
 install(TARGETS keyboard_sim_adapter_node
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -127,6 +127,7 @@ install(PROGRAMS
   scripts/supervised_lio.py
   scripts/lio_ground_adapter.py
   scripts/wait_for_sensors.py
+  scripts/ec_odometry_time_adapter.py
   scripts/navigation_to_chassis.py
   scripts/navigation_initialpose_gate.py
   scripts/rviz_after_map.py

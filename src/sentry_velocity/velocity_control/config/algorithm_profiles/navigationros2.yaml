@@ -82,6 +82,12 @@ actions:
       use_fake_vel: true
     remappings:
       - [/cmd_vel_gimbal, /navigation/cmd_vel_base_link]
+      - [/Odometry/EC, /simulation/raw_odometry_ec]
+
+  - type: node
+    package: velocity_control
+    executable: ec_odometry_time_adapter.py
+    name: ec_odometry_time_adapter
 
   # Simulation adapter converts the gimbal velocity to chassis coordinates
   # before the existing mux selects it alongside chassis-frame keyboard input.
