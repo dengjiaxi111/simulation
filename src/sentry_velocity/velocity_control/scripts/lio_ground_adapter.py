@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Translate isolated LIO outputs to a fixed odom origin at startup ground."""
+"""Transform isolated LIO outputs to a fixed odom origin at startup ground."""
 import copy
+import math
 import numpy as np
 import rclpy
 from nav_msgs.msg import Odometry
@@ -10,15 +11,16 @@ from tf2_ros import Buffer, TransformListener, TransformBroadcaster, TransformEx
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, DurabilityPolicy
 from std_msgs.msg import Bool
-from navigation_initialpose_gate import quaternion_rotate
+from navigation_initialpose_gate import quaternion_rotate, quaternion_multiply
 
 
-def translate_cloud(message, shift):
+def translate_cloud(message, shift, rotation):
     output = copy.deepcopy(message)
     payload = bytearray(message.data)
     endian = ">" if message.is_bigendian else "<"
     fields = {field.name: field for field in message.fields}
-    for axis, delta in zip(("x", "y", "z"), shift):
+    arrays = []
+    for axis in ("x", "y", "z"):
         field = fields[axis]
         if field.datatype not in (PointField.FLOAT32, PointField.FLOAT64) or field.count != 1:
             raise ValueError("PointCloud2 XYZ must be scalar floating-point fields")
@@ -26,7 +28,10 @@ def translate_cloud(message, shift):
         values = np.ndarray((message.height, message.width), dtype=dtype,
                             buffer=payload, offset=field.offset,
                             strides=(message.row_step, message.point_step))
-        values += delta
+        arrays.append(values)
+    points = np.stack(arrays, axis=-1) @ rotation.T + np.asarray(shift)
+    for index, values in enumerate(arrays):
+        values[:] = points[..., index]
     output.data = bytes(payload)
     output.header.frame_id = "odom"
     return output
@@ -39,6 +44,8 @@ class GroundAdapter(Node):
         self.listener = TransformListener(self.buffer, self)
         self.broadcaster = TransformBroadcaster(self)
         self.shift = None
+        self.rotation = np.eye(3)
+        self.rotation_q = (0.0, 0.0, 0.0, 1.0)
         self.ready = False
         self.ready_sub = self.create_subscription(
             Bool, '/lio/extrinsics_ready', self.on_ready,
@@ -68,15 +75,23 @@ class GroundAdapter(Node):
             return False
         offset = quaternion_rotate((orientation.x, orientation.y, orientation.z,
                                     orientation.w), (ground.x, ground.y, ground.z))
-        self.shift = tuple(-p - d for p, d in zip(
-            (position.x, position.y, position.z), offset))
+        x, y, z, w = orientation.x, orientation.y, orientation.z, orientation.w
+        yaw = math.atan2(2*(w*z+x*y), 1-2*(y*y+z*z))
+        c, sn = math.cos(yaw), math.sin(yaw)
+        self.rotation = np.array([[c, sn, 0.0], [-sn, c, 0.0], [0.0, 0.0, 1.0]])
+        self.rotation_q = (0.0, 0.0, math.sin(-yaw/2), math.cos(-yaw/2))
+        origin = np.asarray((position.x, position.y, position.z)) + offset
+        self.shift = tuple(-(self.rotation @ origin))
         self.get_logger().info(f"Fixed ground odom initialized; translation={self.shift}")
         return True
 
     def translate_position(self, position):
-        position.x += self.shift[0]
-        position.y += self.shift[1]
-        position.z += self.shift[2]
+        values = self.rotation @ np.asarray((position.x, position.y, position.z)) + self.shift
+        position.x, position.y, position.z = map(float, values)
+
+    def rotate_orientation(self, orientation):
+        q = quaternion_multiply(self.rotation_q, (orientation.x, orientation.y, orientation.z, orientation.w))
+        orientation.x, orientation.y, orientation.z, orientation.w = q
 
     def on_tf(self, message):
         if not self.ready:
@@ -91,6 +106,7 @@ class GroundAdapter(Node):
             output = copy.deepcopy(transform)
             if output.header.frame_id == "odom":
                 self.translate_position(output.transform.translation)
+                self.rotate_orientation(output.transform.rotation)
             outputs.append(output)
         if outputs:
             self.broadcaster.sendTransform(outputs)
@@ -102,15 +118,20 @@ class GroundAdapter(Node):
             return
         output = copy.deepcopy(message)
         self.translate_position(output.pose.pose.position)
-        # The fixed change of origin has no rotation. Covariances, orientation,
-        # and child-frame velocity therefore retain their original values.
+        self.rotate_orientation(output.pose.pose.orientation)
+        basis = np.zeros((6, 6))
+        basis[:3, :3] = self.rotation
+        basis[3:, 3:] = self.rotation
+        covariance = np.asarray(message.pose.covariance).reshape(6, 6)
+        output.pose.covariance = (basis @ covariance @ basis.T).ravel().tolist()
+        # Child-frame twist is unchanged.
         self.odom_pub.publish(output)
 
     def on_cloud(self, message):
         if self.shift is None or message.header.frame_id != "odom":
             return
         try:
-            output = translate_cloud(message, self.shift)
+            output = translate_cloud(message, self.shift, self.rotation)
         except (KeyError, ValueError) as error:
             self.get_logger().error(f"Cannot translate point cloud: {error}",
                                     throttle_duration_sec=5.0)

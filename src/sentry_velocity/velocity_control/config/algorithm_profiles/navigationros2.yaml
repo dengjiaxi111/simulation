@@ -1,6 +1,5 @@
 required_packages:
   - small_point_lio
-  - localization_initializer
   - sentry_decision
   - fake_vel_transform
   - pointcloud_segmentation
@@ -54,8 +53,7 @@ actions:
     executable: lio_ground_adapter.py
     name: lio_ground_adapter
 
-  # Convert the ground-level RViz pose to physical base_link for NDT.
-  # This adapter never publishes map->odom in NDT mode.
+  # Manual ground initial pose owns map->odom; NDT is not started.
   - type: node
     package: velocity_control
     executable: navigation_initialpose_gate.py
@@ -65,18 +63,7 @@ actions:
         odom_frame: odom
         base_frame: base_links
         initialpose_topic: /initialpose
-        localization_mode: ndt
-
-  - type: node
-    package: localization_initializer
-    executable: localization_initializer_node
-    name: localization_initializer
-    parameters:
-      - package://localization_initializer/config/initializer_params.yaml
-      - auto_initialize: false
-        use_initialpose_as_static_tf: false
-    remappings:
-      - [/initialpose, /localization/initialpose_base_link]
+        localization_mode: manual
 
   - type: node
     package: sentry_decision

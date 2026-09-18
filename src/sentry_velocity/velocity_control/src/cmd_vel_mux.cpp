@@ -102,6 +102,9 @@ private:
         selected = keyboard_command_;
       }
     }
+    // Compensate the simulation's reversed planar drive directions for both inputs.
+    selected.linear.x = -selected.linear.x;
+    selected.linear.y = -selected.linear.y;
     output_pub_->publish(selected);
   }
 
