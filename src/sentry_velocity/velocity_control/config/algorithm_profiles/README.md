@@ -43,9 +43,11 @@ the robot description and joint feedback. The initializer is the sole
 map-to-odom owner; the initial-pose adapter only converts base_links poses to
 physical base_link poses and enables navigation after NDT reports success.
 
-Set the initializer action's map_file to an existing transformed PCD, and the
-map_server action's yaml_filename to its matching 2D map. Launch rejects a
-missing PCD instead of silently allowing the initializer's no-map fallback.
+Map selection belongs to the algorithm: NDT reads map_file directly from
+localization_initializer/config/initializer_params.yaml; map_server reads the
+map argument default from mybringup/launch/run_nav.launch.py. The profile does
+not specify alternate map files. Launch validates the PCD, map YAML and image
+before starting nodes instead of permitting a missing-map fallback.
 No additional rotation is applied to the PCD by the simulation adapter.
 
 The sentry decision node retains its real algorithm inputs for game, friendly
@@ -60,6 +62,15 @@ After release, command timeouts stop the drive normally without reattaching.
 The /simulation/robot_released Bool reports whether detachment has completed.
 Physical ground contact is still required after detachment.
 # navigationros2 ground odometry
+
+The simulation profile overrides IMU acceleration units consistently:
+acc_norm=9.81 and satu_acc=34.335 (3.5 g in m/s^2). Both simulated sensors
+are at the livox_frame origin, so their relative translation is zero.
+supervised_lio.py relays the actual base_link->livox_frame TF onto an
+isolated static topic and repeats it for late discovery. It restarts LIO
+if the algorithm reports its identity-extrinsic fallback. The public
+ground adapter suppresses outputs until successful extrinsic caching is
+confirmed; algorithm source files and the physical sensor mounting are unchanged.
 
 The navigationros2 profile isolates Small Point-LIO's dynamic TF, odometry,
 and registered cloud on /lio/raw_tf, /lio/raw_odometry, and

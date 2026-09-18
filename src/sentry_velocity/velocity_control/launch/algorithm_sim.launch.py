@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import ast
 import os
 import yaml
 
@@ -37,12 +38,44 @@ def _package_path(uri):
 
 def _resolve(value):
     if isinstance(value, dict):
+        if set(value) == {"launch_default"}:
+            source = value["launch_default"]
+            path = _package_path(source["launch"])
+            with open(path, encoding="utf-8") as launch_file:
+                tree = ast.parse(launch_file.read(), filename=path)
+            for call in ast.walk(tree):
+                if not isinstance(call, ast.Call) or not call.args:
+                    continue
+                name = getattr(call.func, "id", getattr(call.func, "attr", ""))
+                if (name == "DeclareLaunchArgument" and
+                        isinstance(call.args[0], ast.Constant) and
+                        call.args[0].value == source["argument"]):
+                    for keyword in call.keywords:
+                        if keyword.arg == "default_value":
+                            return _resolve(ast.literal_eval(keyword.value))
+            raise RuntimeError(f"Cannot read launch default {source['argument']} from {path}")
         if set(value) == {"launch_argument"}:
             return LaunchConfiguration(value["launch_argument"])
         return {key: _resolve(item) for key, item in value.items()}
     if isinstance(value, list):
         return [_resolve(item) for item in value]
     return _package_path(value)
+
+
+def _configured_parameter(parameters, name, node_name):
+    """Read a node's effective YAML/dictionary value without overriding it."""
+    value = None
+    for parameter in parameters:
+        if isinstance(parameter, str):
+            with open(parameter, encoding="utf-8") as config_file:
+                config = yaml.safe_load(config_file) or {}
+            for selector in ("/**", node_name, "/" + node_name):
+                settings = config.get(selector, {}).get("ros__parameters", {})
+                if name in settings:
+                    value = settings[name]
+        elif isinstance(parameter, dict) and name in parameter:
+            value = parameter[name]
+    return value
 
 
 def _make_action(spec):
@@ -83,16 +116,21 @@ def _make_action(spec):
                 raise RuntimeError(
                     f"navigationros2 map file does not exist: {map_files[0]}"
                 )
+            with open(map_files[0], encoding="utf-8") as map_yaml:
+                image = (yaml.safe_load(map_yaml) or {}).get("image")
+            if not isinstance(image, str) or not image:
+                raise RuntimeError(f"Map YAML has no image path: {map_files[0]}")
+            image_path = os.path.join(os.path.dirname(map_files[0]), image)
+            if not os.path.isfile(image_path):
+                raise RuntimeError(f"Map image does not exist: {image_path}")
         if spec.get("package") == "localization_initializer":
-            map_files = [
-                parameter["map_file"] for parameter in parameters
-                if isinstance(parameter, dict) and "map_file" in parameter
-            ]
-            if not map_files or not os.path.isfile(map_files[-1]):
+            map_file = _configured_parameter(
+                parameters, "map_file", spec.get("name", "localization_initializer"))
+            if not isinstance(map_file, str) or not os.path.isfile(map_file):
                 raise RuntimeError(
                     "NDT localization PCD does not exist: "
-                    f"{map_files[-1] if map_files else '(map_file not configured)'}. "
-                    "Set the profile map_file to the transformed localization map; "
+                    f"{map_file or '(map_file not configured)'}. "
+                    "Check map_file in the algorithm's localization configuration; "
                     "refusing the algorithm's fallback without a PCD map."
                 )
         # Simulation time is enforced for every algorithm-side node.

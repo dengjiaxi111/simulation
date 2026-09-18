@@ -124,6 +124,7 @@ install(TARGETS control_mode_once_node
 )
 
 install(PROGRAMS
+  scripts/supervised_lio.py
   scripts/lio_ground_adapter.py
   scripts/wait_for_sensors.py
   scripts/navigation_to_chassis.py

@@ -20,17 +20,22 @@ navigation_tf_gate:
 actions:
   # LIO owns odom -> base_link and consumes the simulated Livox topics.
   - type: node
-    package: small_point_lio
-    executable: small_point_lio_node
+    package: velocity_control
+    executable: supervised_lio.py
     name: small_point_lio
     delay: 1.5
     remappings:
       - [/tf, /lio/raw_tf]
+      - [/tf_static, /lio/extrinsic_tf_static]
       - [/Odometry, /lio/raw_odometry]
       - [/cloud_registered, /lio/raw_cloud_registered]
     parameters:
       - package://small_point_lio/config/mid360_sim.yaml
       - lidar_frame: livox_frame
+        acc_norm: 9.81
+        satu_acc: 34.335
+        extrinsic_T: [0.0, 0.0, 0.0]
+        extrinsic_R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
         # save_pcd remains owned by mid360_sim.yaml and the algorithm.
     wait_for_sensors:
       base_frame: base_link
@@ -68,10 +73,7 @@ actions:
     name: localization_initializer
     parameters:
       - package://localization_initializer/config/initializer_params.yaml
-      # Same coordinates as scan.pcd; sparse 0.08 m voxel representatives.
-      # Original algorithm map and source files are never overwritten.
-      - map_file: /home/dengjiaxi/simulation_seu/navigationsim/maps/scan_voxel_008.pcd
-        auto_initialize: false
+      - auto_initialize: false
         use_initialpose_as_static_tf: false
     remappings:
       - [/initialpose, /localization/initialpose_base_link]
@@ -111,7 +113,10 @@ actions:
     respawn: true
     respawn_delay: 2.0
     parameters:
-      - yaml_filename: package://mybringup/map/RMUC.yaml
+      - yaml_filename:
+          launch_default:
+            launch: package://mybringup/launch/run_nav.launch.py
+            argument: map
 
   # Activate the static map independently.  Planner/controller startup must
   # never be able to hold /map in the inactive lifecycle state.

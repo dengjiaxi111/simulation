@@ -37,7 +37,7 @@ cleanup_previous_run() {
     '[c]md_vel_mux_node' '[c]ontrol_mode_once_node' '[p]p2_to_livox_node' \
     '[n]avigation_initialpose_gate.py' '[i]mu_alias_node' '[c]lock_bridge' \
     '[s]tartup_pose_release.py' '[n]avigation_to_chassis.py' '[w]ait_for_sensors.py' \
-    '[w]ait_for_tf.py' '[r]viz_after_map.py' '[l]io_ground_adapter.py'
+    '[w]ait_for_tf.py' '[r]viz_after_map.py' '[l]io_ground_adapter.py' '[s]upervised_lio.py'
 
   # Both supported algorithm launch styles; only processes are stopped.
   stop_matching TERM \
@@ -59,7 +59,7 @@ cleanup_previous_run() {
     '[c]md_vel_mux_node' '[c]ontrol_mode_once_node' '[p]p2_to_livox_node' \
     '[n]avigation_initialpose_gate.py' '[i]mu_alias_node' '[c]lock_bridge' \
     '[s]tartup_pose_release.py' '[n]avigation_to_chassis.py' '[w]ait_for_sensors.py' \
-    '[w]ait_for_tf.py' '[r]viz_after_map.py' '[l]io_ground_adapter.py' \
+    '[w]ait_for_tf.py' '[r]viz_after_map.py' '[l]io_ground_adapter.py' '[s]upervised_lio.py' \
     '[r]os2 launch velocity_control algorithm_sim.launch.py' \
     '[r]os2 launch nav_bringup navigation_s.launch.py' '[s]mall_point_lio_node' \
     '[s]mall_point_lio' '[l]io_after_tf.py' '[l]ocalization_initializer_node' '[n]av_server' '[n]av2_' \
