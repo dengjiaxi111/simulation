@@ -51,6 +51,11 @@ struct Module
   double steer_position{0.0};
   double steer_command{0.0};
   double wheel_command{0.0};
+  double initial_angle{0.0};
+  double steer_velocity{0.0};
+  double wheel_velocity{0.0};
+  bool has_initial_angle{false};
+  bool has_wheel{false};
   bool has_position{false};
 };
 
@@ -108,9 +113,9 @@ public:
       modules_[i].steer_zero_offset = zero_offsets[i];
       modules_[i].drive_sign = drive_signs[i];
       steer_publishers_[i] = create_publisher<std_msgs::msg::Float64>(
-        "/swerve/" + modules_[i].steer_joint + "/cmd_pos", 10);
+        "/swerve/" + modules_[i].steer_joint + "/target_angle", 10);
       wheel_publishers_[i] = create_publisher<std_msgs::msg::Float64>(
-        "/swerve/" + modules_[i].wheel_joint + "/cmd_vel", 10);
+        "/swerve/" + modules_[i].wheel_joint + "/target_speed", 10);
     }
 
     command_subscription_ = create_subscription<geometry_msgs::msg::Twist>(
@@ -125,6 +130,7 @@ public:
       std::bind(&SwerveSimController::control_update, this));
 
     last_command_time_ = now();
+    last_control_time_ = now();
     RCLCPP_INFO(
       get_logger(),
       "Swerve controller ready: %.1f Hz, wheel radius %.4f m, timeout %.3f s",
@@ -156,21 +162,33 @@ private:
 
   void on_joint_state(const sensor_msgs::msg::JointState::SharedPtr message)
   {
-    for (std::size_t state_index = 0; state_index < message->name.size(); ++state_index) {
-      if (state_index >= message->position.size()) {
-        break;
-      }
-      for (auto & module : modules_) {
-        if (message->name[state_index] == module.steer_joint) {
-          module.steer_position = message->position[state_index];
-          if (!module.has_position) {
-            module.steer_command = module.steer_position;
-            module.has_position = true;
+    const auto stamp = now();
+    for (auto & module : modules_) {
+      // Each cycle requires valid position AND velocity feedback for both motors.
+      module.has_position = false;
+      module.has_wheel = false;
+      for (std::size_t i = 0; i < message->name.size(); ++i) {
+        if (i >= message->velocity.size() || !std::isfinite(message->velocity[i])) continue;
+        if (message->name[i] == module.steer_joint && i < message->position.size() &&
+          std::isfinite(message->position[i])) {
+          module.steer_position = message->position[i];
+          module.steer_velocity = message->velocity[i];
+          if (!module.has_initial_angle) {
+            module.initial_angle = module.steer_position;
+            module.has_initial_angle = true;
+            module.steer_command = module.initial_angle;
           }
-          break;
+          module.has_position = true;
+        }
+        if (message->name[i] == module.wheel_joint) {
+          module.wheel_velocity = message->velocity[i];
+          module.has_wheel = true;
         }
       }
     }
+    initialized_ = std::all_of(modules_.begin(), modules_.end(),
+      [](const Module & m) { return m.has_position && m.has_wheel; });
+    last_feedback_time_ = stamp;
   }
 
   bool command_is_fresh() const
@@ -180,6 +198,10 @@ private:
 
   void control_update()
   {
+    const double dt = (now() - last_control_time_).seconds();
+    if (dt <= 0.0) return;  // Simulation pause: do not integrate against wall time.
+    last_control_time_ = now();
+    feedback_valid_ = initialized_ && (now() - last_feedback_time_).seconds() <= 0.2;
     geometry_msgs::msg::Twist command;
     if (command_is_fresh()) {
       command = target_command_;
@@ -190,6 +212,8 @@ private:
     if (stopped) {
       for (auto & module : modules_) {
         module.wheel_command = 0.0;
+        // sentry2026 low-speed parking, adapted to recorded spawn steer angles.
+        if (estimated_speed() <= 0.5) module.steer_command = module.initial_angle;
       }
     } else {
       calculate_commands(command.linear.x, command.linear.y, command.angular.z);
@@ -234,19 +258,27 @@ private:
     }
   }
 
+  double estimated_speed() const
+  {
+    double vx = 0.0, vy = 0.0;
+    for (const auto & m : modules_) {
+      const double a = m.steer_direction_sign * m.steer_position + m.steer_zero_offset;
+      const double v = m.drive_sign * m.wheel_velocity * wheel_radius_;
+      vx += v * std::cos(a); vy += v * std::sin(a);
+    }
+    return std::hypot(vx, vy) / kModuleCount;
+  }
+
   void publish_commands()
   {
     for (std::size_t i = 0; i < kModuleCount; ++i) {
-      std_msgs::msg::Float64 steer_message;
-      // Do not force an uninitialized steering joint to zero during spawn.
-      // This avoids the startup kick that makes the four steer modules move
-      // while the gimbal command is the only intended startup motion.
-      if (modules_[i].has_position) {
-        steer_message.data = modules_[i].steer_command;
-        steer_publishers_[i]->publish(steer_message);
-      }
-      std_msgs::msg::Float64 wheel_message;
-      wheel_message.data = modules_[i].wheel_command;
+      auto & m = modules_[i];
+      std_msgs::msg::Float64 wheel_message, steer_message;
+      // Legacy direct velocity/position actuation is disabled. These are setpoints;
+      // sentry_motor_controller executes feedback PID at every physics step.
+      wheel_message.data = feedback_valid_ ? m.wheel_command : 0.0;
+      steer_message.data = feedback_valid_ ? m.steer_command : m.initial_angle;
+      steer_publishers_[i]->publish(steer_message);
       wheel_publishers_[i]->publish(wheel_message);
     }
   }
@@ -254,6 +286,8 @@ private:
   std::string command_topic_;
   std::string joint_state_topic_;
   double control_rate_{50.0};
+  bool initialized_{false}, feedback_valid_{false};
+  rclcpp::Time last_control_time_, last_feedback_time_;
   double command_timeout_{0.2};
   double command_deadband_{1.0e-4};
   double wheel_radius_{0.0535};

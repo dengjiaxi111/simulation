@@ -2,7 +2,7 @@ swerve_sim_controller:
   ros__parameters:
     command_topic: /cmd_vel_chassis
     joint_state_topic: /joint_states
-    control_rate: 50.0
+    control_rate: 100.0
     command_timeout: 0.2
     command_deadband: 0.0001
     wheel_radius: 0.0535

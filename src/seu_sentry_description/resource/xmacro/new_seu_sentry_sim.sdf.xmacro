@@ -32,6 +32,7 @@
       <joint_name>gimbal_yaw_joint</joint_name><use_force_commands>false</use_force_commands><p_gain>0.2</p_gain><i_gain>0.01</i_gain>
     </plugin>
 
+    <!-- Legacy wheel velocity and steer position controllers disabled.
     <plugin filename="gz-sim-joint-position-controller-system" name="gz::sim::systems::JointPositionController">
       <joint_name>front_left_steer_joint</joint_name><p_gain>20</p_gain><i_gain>0.1</i_gain><d_gain>1</d_gain><cmd_min>-40</cmd_min><cmd_max>40</cmd_max>
     </plugin>
@@ -56,6 +57,14 @@
     </plugin>
     <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
       <joint_name>rear_right_wheel_joint</joint_name><use_force_commands>false</use_force_commands><p_gain>0.2</p_gain><i_gain>0.01</i_gain>
+    </plugin>
+    -->
+    <!-- Physics-step motor loops use the official JointForceCmd torque interface. -->
+    <plugin filename="libsentry_motor_controller.so" name="seu_sentry_sim_control::SentryMotorController">
+      <wheel_kp>0.1</wheel_kp><wheel_ki>0.2</wheel_ki><wheel_kd>0</wheel_kd>
+      <steer_kp>8</steer_kp><steer_ki>0.2</steer_ki><steer_kd>0.08</steer_kd>
+      <wheel_torque_limit>2</wheel_torque_limit><steer_torque_limit>5</steer_torque_limit>
+      <integral_limit>1</integral_limit><command_timeout>0.2</command_timeout>
     </plugin>
   </model>
 </sdf>

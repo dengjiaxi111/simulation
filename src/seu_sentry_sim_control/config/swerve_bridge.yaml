@@ -28,50 +28,50 @@
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/front_left_steer_joint/cmd_pos
-  gz_topic_name: /model/sentry/joint/front_left_steer_joint/0/cmd_pos
+- ros_topic_name: /swerve/front_left_steer_joint/target_angle
+  gz_topic_name: /model/sentry/joint/front_left_steer_joint/target_angle
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/front_right_steer_joint/cmd_pos
-  gz_topic_name: /model/sentry/joint/front_right_steer_joint/0/cmd_pos
+- ros_topic_name: /swerve/front_right_steer_joint/target_angle
+  gz_topic_name: /model/sentry/joint/front_right_steer_joint/target_angle
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/rear_left_steer_joint/cmd_pos
-  gz_topic_name: /model/sentry/joint/rear_left_steer_joint/0/cmd_pos
+- ros_topic_name: /swerve/rear_left_steer_joint/target_angle
+  gz_topic_name: /model/sentry/joint/rear_left_steer_joint/target_angle
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/rear_right_steer_joint/cmd_pos
-  gz_topic_name: /model/sentry/joint/rear_right_steer_joint/0/cmd_pos
+- ros_topic_name: /swerve/rear_right_steer_joint/target_angle
+  gz_topic_name: /model/sentry/joint/rear_right_steer_joint/target_angle
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/front_left_wheel_joint/cmd_vel
-  gz_topic_name: /model/sentry/joint/front_left_wheel_joint/cmd_vel
+- ros_topic_name: /swerve/front_left_wheel_joint/target_speed
+  gz_topic_name: /model/sentry/joint/front_left_wheel_joint/target_speed
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/front_right_wheel_joint/cmd_vel
-  gz_topic_name: /model/sentry/joint/front_right_wheel_joint/cmd_vel
+- ros_topic_name: /swerve/front_right_wheel_joint/target_speed
+  gz_topic_name: /model/sentry/joint/front_right_wheel_joint/target_speed
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/rear_left_wheel_joint/cmd_vel
-  gz_topic_name: /model/sentry/joint/rear_left_wheel_joint/cmd_vel
+- ros_topic_name: /swerve/rear_left_wheel_joint/target_speed
+  gz_topic_name: /model/sentry/joint/rear_left_wheel_joint/target_speed
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ
 
-- ros_topic_name: /swerve/rear_right_wheel_joint/cmd_vel
-  gz_topic_name: /model/sentry/joint/rear_right_wheel_joint/cmd_vel
+- ros_topic_name: /swerve/rear_right_wheel_joint/target_speed
+  gz_topic_name: /model/sentry/joint/rear_right_wheel_joint/target_speed
   ros_type_name: std_msgs/msg/Float64
   gz_type_name: gz.msgs.Double
   direction: ROS_TO_GZ

@@ -27,6 +27,10 @@ target_link_libraries(startup_pose_lock
   gz-transport13::gz-transport13
 )
 install(TARGETS startup_pose_lock LIBRARY DESTINATION lib)
+add_library(sentry_motor_controller SHARED src/sentry_motor_controller.cpp)
+target_link_libraries(sentry_motor_controller gz-sim8::gz-sim8 gz-plugin2::register gz-transport13::gz-transport13)
+install(TARGETS sentry_motor_controller LIBRARY DESTINATION lib)
 install(DIRECTORY config DESTINATION share/${PROJECT_NAME})
+install(FILES README.md DESTINATION share/${PROJECT_NAME})
 
 ament_package()
