@@ -17,7 +17,7 @@ class NavigationToChassis(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         # sentry2026 UPPERPCREC_PERIOD: 20 ms communication + 60 ms processing.
-        self.delay = float(self.declare_parameter("navigation_delay_seconds", 0.08).value)
+        self.delay = float(self.declare_parameter("navigation_delay_seconds", 0.00).value)
         if not math.isfinite(self.delay) or self.delay < 0.0:
             raise ValueError("navigation_delay_seconds must be finite and nonnegative")
         self.publisher = self.create_publisher(Twist, "/navigation/cmd_vel", 10)

@@ -1,0 +1,106 @@
+required_packages:
+- fake_vel_transform
+- mybringup
+- nav2_map_server
+- nav2_planner
+- nav2_controller
+- nav2_bt_navigator
+- nav2_behaviors
+- nav2_lifecycle_manager
+navigation_tf_gate:
+  target_frame: odom
+  source_frame: base_link_fake
+actions:
+- type: include
+  launch: package://fake_vel_transform/launch/fake_vel_transform.launch.py
+  launch_arguments:
+    use_sim_time: true
+    use_fake_vel: true
+  remappings:
+  - - /cmd_vel_gimbal
+    - /navigation/cmd_vel_base_link
+  - - /Odometry/EC
+    - /simulation/raw_odometry_ec
+- type: node
+  package: velocity_control
+  executable: ec_odometry_time_adapter.py
+  name: ec_odometry_time_adapter
+- type: node
+  package: velocity_control
+  executable: navigation_to_chassis.py
+  name: navigation_to_chassis
+  parameters:
+  - navigation_delay_seconds: 0.0
+- type: lifecycle_node
+  package: nav2_map_server
+  executable: map_server
+  name: map_server
+  respawn: true
+  respawn_delay: 2.0
+  parameters:
+  - yaml_filename: /home/dengjiaxi/simulation_seu/navigationsim/pid_tuning/test_map.yaml
+- type: node
+  package: nav2_lifecycle_manager
+  executable: lifecycle_manager
+  name: map_lifecycle_manager
+  delay: 0.5
+  parameters:
+  - autostart: true
+  - node_names:
+    - map_server
+- type: lifecycle_node
+  package: nav2_planner
+  executable: planner_server
+  name: planner_server
+  delay: 3.0
+  parameters:
+  - package://mybringup/config/costmap2d.yaml
+  - package://velocity_control/config/algorithm_profiles/navigationros2_costmap_compat.yaml
+  - package://mybringup/config/planner.yaml
+  - package://velocity_control/config/algorithm_profiles/navigationros2_planner_compat.yaml
+  - /home/dengjiaxi/simulation_seu/navigationsim/pid_tuning/test_costmaps.yaml
+  remappings:
+  - - local_costmap/scan
+    - /scan
+- type: lifecycle_node
+  package: nav2_controller
+  executable: controller_server
+  name: controller_server
+  delay: 3.0
+  parameters:
+  - package://mybringup/config/costmap2d.yaml
+  - package://velocity_control/config/algorithm_profiles/navigationros2_costmap_compat.yaml
+  - package://mybringup/config/controller.yaml
+  - /home/dengjiaxi/simulation_seu/navigationsim/pid_tuning/test_costmaps.yaml
+  - PurePursuit.desired_linear_vel: 2.0
+    goal_checker.xy_goal_tolerance: 0.05
+- type: lifecycle_node
+  package: nav2_bt_navigator
+  executable: bt_navigator
+  name: bt_navigator
+  delay: 3.0
+  parameters:
+  - package://mybringup/config/nav_bt.yaml
+  - package://velocity_control/config/algorithm_profiles/navigationros2_nav_bt_compat.yaml
+  - default_nav_to_pose_bt_xml: package://mybringup/config/my_nav_to_pose_bt.xml
+    default_nav_through_poses_bt_xml: package://mybringup/config/my_nav_through_poses_bt.xml
+- type: lifecycle_node
+  package: nav2_behaviors
+  executable: behavior_server
+  name: behavior_server
+  delay: 3.0
+  parameters:
+  - package://mybringup/config/nav_bt.yaml
+  - package://velocity_control/config/algorithm_profiles/navigationros2_nav_bt_compat.yaml
+- type: node
+  package: nav2_lifecycle_manager
+  executable: lifecycle_manager
+  name: navigation_lifecycle_manager
+  delay: 5.0
+  parameters:
+  - autostart: true
+  - node_names:
+    - controller_server
+    - planner_server
+    - bt_navigator
+    - behavior_server

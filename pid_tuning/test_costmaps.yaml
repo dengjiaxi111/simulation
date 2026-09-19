@@ -1,0 +1,32 @@
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      global_frame: map
+      inflation_layer:
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.5
+        plugin: nav2_costmap_2d::InflationLayer
+      plugins:
+      - static_layer
+      - inflation_layer
+      robot_base_frame: base_link_fake
+      static_layer:
+        map_subscribe_transient_local: true
+        plugin: nav2_costmap_2d::StaticLayer
+      use_sim_time: true
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      global_frame: odom
+      inflation_layer:
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.5
+        plugin: nav2_costmap_2d::InflationLayer
+      plugins:
+      - static_layer
+      - inflation_layer
+      robot_base_frame: base_link_fake
+      static_layer:
+        map_subscribe_transient_local: true
+        plugin: nav2_costmap_2d::StaticLayer
+      use_sim_time: true

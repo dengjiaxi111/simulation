@@ -2,12 +2,14 @@
 
 import ast
 import os
+import re
 import yaml
 
-from ament_index_python.packages import get_package_share_directory
+from ament_index_python.packages import get_package_prefix, get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    ExecuteProcess,
     GroupAction,
     IncludeLaunchDescription,
     LogInfo,
@@ -202,7 +204,7 @@ def _launch_setup(context):
     for package in required_packages:
         get_package_share_directory(package)
 
-    actions = [SetEnvironmentVariable("ROS_STACK_SIZE", "16777216")]
+    actions = []
 
     # LIO is intentionally allowed to start as soon as its static sensor
     # extrinsic is available.  Only Nav2 activation waits for the complete
@@ -244,7 +246,40 @@ def _launch_setup(context):
             )
         )
 
-    return actions
+    # A launch process can be terminated before launch_ros has reaped every
+    # child.  Remove only an orphaned instance of this package's EC adapter,
+    # and do it before starting any profile action so the new adapter cannot
+    # be mistaken for the stale one.
+    adapter_path = os.path.join(
+        get_package_prefix("velocity_control"),
+        "lib", "velocity_control", "ec_odometry_time_adapter.py",
+    )
+    stale_adapter_pattern = rf"^python3 {re.escape(adapter_path)}( |$)"
+    cleanup_script = (
+        'pattern="$1"; '
+        'pkill --signal TERM --full "$pattern" 2>/dev/null || true; '
+        'for attempt in $(seq 1 40); do '
+        'pgrep --full "$pattern" >/dev/null || exit 0; '
+        'sleep 0.05; '
+        'done; '
+        'echo "Timed out waiting for stale EC odometry adapter" >&2; exit 1'
+    )
+    cleanup_stale_adapter = ExecuteProcess(
+        cmd=[
+            "bash", "-c", cleanup_script,
+            "cleanup_stale_ec_odometry_adapter", stale_adapter_pattern,
+        ],
+        name="cleanup_stale_ec_odometry_adapter",
+        output="screen",
+    )
+
+    return [
+        SetEnvironmentVariable("ROS_STACK_SIZE", "16777216"),
+        RegisterEventHandler(
+            OnProcessExit(target_action=cleanup_stale_adapter, on_exit=actions)
+        ),
+        cleanup_stale_adapter,
+    ]
 
 
 def generate_launch_description():
